@@ -14,4 +14,4 @@ chmod +x user/testbin/randcall/gencalls.sh;
 chmod +x mk/installheaders.sh
 ./compile.sh;
 cd ~/csc369/root;
-host-mksfs DISK1.img OUR_FS1;
+hostbin/host-mksfs hd0 MYFS;
