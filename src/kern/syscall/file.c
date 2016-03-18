@@ -75,7 +75,10 @@ filetable_init(void)
 
 	// Declare file descriptor.
 	int fd, result;
+
+	// Setup filename path.
 	char filename[5];
+	strcpy(filename, "con:");
 
 	// Allocate memory for the new filetable.
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
@@ -86,18 +89,15 @@ filetable_init(void)
 		curthread->t_filetable->t_entries[fd] = NULL;
 	}
 
-	// Setup file descriptor for stdin.
-	strcpy(filename, "con:");
+	// [stdin]  Setup file descriptor, add to the filetable at index 0.
 	result = file_open(filename, O_RDONLY, 0, &fd);
-	if (result) {return result;} // If file_open is unsuccessful, return error.
+	if (result) {return result;} // If an error occurred, return error.
 
-	// Setup file descriptor for stdout.
-	strcpy(filename, "con:");
+	// [stdout] Setup file descriptor, add to the filetable at index 1.
 	result = file_open(filename, O_WRONLY, 0, &fd);
 	if (result) {return result;} // If an error occurred, return error.
 
-	// Setup file descriptor for stderr.
-	strcpy(filename, "con:");
+	// [stderr] Setup file descriptor, add to the filetable at index 2.
 	result = file_open(filename, O_WRONLY, 0, &fd);
 	if (result) {return result;} // If an error occurred, return error.
 
