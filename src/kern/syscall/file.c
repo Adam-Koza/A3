@@ -78,7 +78,7 @@ filetable_init(void)
 	// Declare file descriptor.
 	int fd;
 	int result;
-	char link[5];
+	char filename[5];
 
 	// Allocate memory for the new filetable.
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
@@ -93,7 +93,7 @@ filetable_init(void)
 
 	// Setup file descriptor for stdin.
 	// Requires file_open
-	// result = file_open(path, O_RDONLY, 0, &fd);
+	// result = file_open(link, O_RDONLY, 0, &fd);
 	// if (result){
 	// 	return result;
 	// }
