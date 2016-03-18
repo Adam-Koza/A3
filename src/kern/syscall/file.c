@@ -70,6 +70,40 @@ file_close(int fd)
 int
 filetable_init(void)
 {
+	// Make sure filetable doesn't already exist.
+	if (curthread->t_filetable != NULL){
+			return EINVAL;
+	}
+
+	// Declare file descriptor.
+	int fd;
+	int result;
+	char link[5];
+
+	// Allocate memory for the new filetable.
+	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
+	if (curthread->t_filetable == NULL){
+		return ENOMEM;
+	}
+
+	// Initialize all file descriptor entries to NULL.
+	for (fd = 0; fd < __OPEN_MAX; fd++){
+		curthread->t_filetable->t_entries[fd] = NULL;
+	}
+
+	// Setup file descriptor for stdin.
+	// Requires file_open
+	// result = file_open(path, O_RDONLY, 0, &fd);
+	// if (result){
+	// 	return result;
+	// }
+    // ...
+	// Setup file descriptor for stdout.
+	// Requires file_open
+	// ...
+	// Setup file descriptor for stderr.
+	// Requires file_open
+
 	return 0;
 }	
 
