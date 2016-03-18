@@ -70,6 +70,36 @@ file_close(int fd)
 int
 filetable_init(void)
 {
+	// Make sure filetable doesn't already exist.
+	if (curthread->t_filetable != NULL) {return EINVAL;}
+
+	// Declare file descriptor.
+	int fd, result;
+	char filename[5];
+
+	// Allocate memory for the new filetable.
+	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
+	if (curthread->t_filetable == NULL) {return ENOMEM;}
+
+	// Initialize all file descriptor entries to NULL.
+	for (fd = 0; fd < __OPEN_MAX; fd++){
+		curthread->t_filetable->t_entries[fd] = NULL;
+	}
+
+	// Setup file descriptor for stdin.
+	// Requires file_open
+	// strcpy(filename, "con:");
+	// result = file_open(filename, O_RDONLY, 0, &fd);
+	// if (result){    // If non-zero.
+	// 	return result; // Return error.
+	// }
+	// ...
+	// Setup file descriptor for stdout.
+	// Requires file_open
+	// ...
+	// Setup file descriptor for stderr.
+	// Requires file_open
+
 	return 0;
 }	
 
@@ -82,7 +112,12 @@ filetable_init(void)
 void
 filetable_destroy(struct filetable *ft)
 {
-        (void)ft;
+    int file_d;
+    for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
+    	struct filetable_entry *entry = ft->t_entries[file_d];
+    	if (entry == NULL) {file_close(file_d);}
+    }
+    kfree(ft);
 }	
 
 
