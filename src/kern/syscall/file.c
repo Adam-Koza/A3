@@ -88,6 +88,7 @@ filetable_init(void)
 
 	// Setup file descriptor for stdin.
 	// Requires file_open
+	// strcpy(filename, "con:");
 	// result = file_open(filename, O_RDONLY, 0, &fd);
 	// if (result){    // If non-zero.
 	// 	return result; // Return error.
@@ -111,7 +112,12 @@ filetable_init(void)
 void
 filetable_destroy(struct filetable *ft)
 {
-        (void)ft;
+    int file_d;
+    for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
+    	struct filetable_entry *entry = ft->t_entries[file_d];
+    	if (entry == NULL) {file_close(file_d);}
+    }
+    kfree(ft);
 }	
 
 
