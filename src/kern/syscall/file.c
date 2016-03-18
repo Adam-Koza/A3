@@ -87,19 +87,21 @@ filetable_init(void)
 	}
 
 	// Setup file descriptor for stdin.
-	// Requires file_open
-	// strcpy(filename, "con:");
-	// result = file_open(filename, O_RDONLY, 0, &fd);
-	// if (result){    // If non-zero.
-	// 	return result; // Return error.
-	// }
-	// ...
-	// Setup file descriptor for stdout.
-	// Requires file_open
-	// ...
-	// Setup file descriptor for stderr.
-	// Requires file_open
+	strcpy(filename, "con:");
+	result = file_open(filename, O_RDONLY, 0, &fd);
+	if (result) {return result;} // If file_open is unsuccessful, return error.
 
+	// Setup file descriptor for stdout.
+	strcpy(filename, "con:");
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// Setup file descriptor for stderr.
+	strcpy(filename, "con:");
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// Otherwise, return success.
 	return 0;
 }	
 
