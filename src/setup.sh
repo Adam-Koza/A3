@@ -14,4 +14,6 @@ chmod +x user/testbin/randcall/gencalls.sh;
 chmod +x mk/installheaders.sh
 ./compile.sh;
 cd ~/csc369/root;
-hostbin/host-mksfs hd0 MYFS;
+gnome-terminal -x sys161 kernel;
+sleep 2;
+hostbin/host-mksfs DISK1.img MYFS;
