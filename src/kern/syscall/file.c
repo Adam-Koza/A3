@@ -71,20 +71,15 @@ int
 filetable_init(void)
 {
 	// Make sure filetable doesn't already exist.
-	if (curthread->t_filetable != NULL){
-			return EINVAL;
-	}
+	if (curthread->t_filetable != NULL) {return EINVAL;}
 
 	// Declare file descriptor.
-	int fd;
-	int result;
+	int fd, result;
 	char filename[5];
 
 	// Allocate memory for the new filetable.
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
-	if (curthread->t_filetable == NULL){
-		return ENOMEM;
-	}
+	if (curthread->t_filetable == NULL) {return ENOMEM;}
 
 	// Initialize all file descriptor entries to NULL.
 	for (fd = 0; fd < __OPEN_MAX; fd++){
@@ -93,11 +88,11 @@ filetable_init(void)
 
 	// Setup file descriptor for stdin.
 	// Requires file_open
-	// result = file_open(link, O_RDONLY, 0, &fd);
-	// if (result){
-	// 	return result;
+	// result = file_open(filename, O_RDONLY, 0, &fd);
+	// if (result){    // If non-zero.
+	// 	return result; // Return error.
 	// }
-    // ...
+	// ...
 	// Setup file descriptor for stdout.
 	// Requires file_open
 	// ...
