@@ -524,6 +524,7 @@ thread_fork(const char *name,
 {
 	struct thread *newthread;
 	int result;
+	int fd;
 
 	newthread = thread_create(name);
 	if (newthread == NULL) {
@@ -566,6 +567,32 @@ thread_fork(const char *name,
 	if (curthread->t_cwd != NULL) {
 		VOP_INCREF(curthread->t_cwd);
 		newthread->t_cwd = curthread->t_cwd;
+	}
+	/* OOOOK, we need to copy filetable from the parent to child process
+	 */
+
+	if (curthread->t_filetable!=NULL){
+		if (newthread->t_filetable==NULL){
+			// check whether filetalbe exists for newthread.
+			newthread->t_filetable = malloc(sizeof(struct filetable));
+		}
+		if (newthread->t_filetable == NULL){
+			return ENOMEM;
+		}
+		// now we copy the file descriptors
+		for (fd=0; fd<__OPEN_MAX;fd++){
+			if (curthread->t_filetable->t_entries[fd]!=NULL){
+				newthread->t_filetable->t_entries[fd]=curthread->t_filetable->t_entries[fd];
+				// increment open count!
+				vnode_incompen(curthread->t_filetable->t_entries[fd]);
+			}else{
+				// no fd??
+				newthread->t_filetable=NULL;
+			}
+		}
+	}else{
+		// no fd??
+		newthread->t_filetable = NULL;
 	}
 
 	/*

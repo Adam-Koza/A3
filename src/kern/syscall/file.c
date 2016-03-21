@@ -99,6 +99,38 @@ file_close(int fd)
 int
 filetable_init(void)
 {
+	// Make sure filetable doesn't already exist.
+	if (curthread->t_filetable != NULL) {return EINVAL;}
+
+	// Declare file descriptor.
+	int fd, result;
+
+	// Setup filename path.
+	char filename[5];
+	strcpy(filename, "con:");
+
+	// Allocate memory for the new filetable.
+	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
+	if (curthread->t_filetable == NULL) {return ENOMEM;}
+
+	// Initialize all file descriptor entries to NULL.
+	for (fd = 0; fd < __OPEN_MAX; fd++){
+		curthread->t_filetable->t_entries[fd] = NULL;
+	}
+
+	// [stdin]  Setup file descriptor, add to the filetable at index 0.
+	result = file_open(filename, O_RDONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// [stdout] Setup file descriptor, add to the filetable at index 1.
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// [stderr] Setup file descriptor, add to the filetable at index 2.
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// Otherwise, return success.
 	return 0;
 }	
 
@@ -111,7 +143,12 @@ filetable_init(void)
 void
 filetable_destroy(struct filetable *ft)
 {
-        (void)ft;
+    int file_d;
+    for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
+    	struct filetable_entry *entry = ft->t_entries[file_d];
+    	if (entry == NULL) {file_close(file_d);}
+    }
+    kfree(ft);
 }	
 
 
