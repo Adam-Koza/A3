@@ -18,7 +18,7 @@ struct vnode;
  * array of ints is just intended to make the compiler happy.
  */
 struct filetable {
-	int changeme[__OPEN_MAX]; /* dummy type */
+	struct vnode *t_entries[__OPEN_MAX];
 };
 
 /* these all have an implicit arg of the curthread's filetable */
