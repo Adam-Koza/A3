@@ -26,13 +26,36 @@
 int
 file_open(char *filename, int flags, int mode, int *retfd)
 {
-	(void)filename;
-	(void)flags;
-	(void)retfd;
-	(void)mode;
+
+	// filename is an invalid pointer
+	if (filename == NULL){
+		return EFAULT;
+	}
+
+	struct vnode *newFile;
+	int result;
 
 
-	return EUNIMP;
+	//find fd from file table of curthread
+	int fd = 0;
+	while (curthread->t_filetable->t_entries[fd] != NULL){
+		if (fd > __OPEN_MAX)
+			return EMFILE; // File table full
+		fd++;
+	}
+	// We have an fd!
+
+	// Most done in  vfs_open, will check for valid flags
+	result = vfs_open(filename, flags, (mode_t)mode, &newFile);
+	// If error, return with that error
+	if (result){
+		return result;}
+
+	// Set the table entry to vnode of the new file
+	curthread->t_filetable->t_entries[fd] = newFile;
+
+	// Success
+	return 0;
 }
 
 
@@ -45,6 +68,12 @@ file_open(char *filename, int flags, int mode, int *retfd)
 int
 file_close(int fd)
 {
+
+	// first check open count
+	// if 1, decrement, and undo op
+
+	// else decrement, and remove ptr from table.
+	// DO NOT free as another process has it open.
         (void)fd;
 
 	return EUNIMP;
