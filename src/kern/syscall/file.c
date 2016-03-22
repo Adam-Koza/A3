@@ -44,7 +44,7 @@ file_open(char *filename, int flags, int mode, int *retfd)
 		fd++;
 	}
 	// We have an fd!
-
+	*retfd = fd;
 	// Most done in  vfs_open, will check for valid flags
 	result = vfs_open(filename, flags, (mode_t)mode, &newFile);
 	// If error, return with that error
@@ -145,8 +145,8 @@ filetable_destroy(struct filetable *ft)
 {
     int file_d;
     for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
-    	struct filetable_entry *entry = ft->t_entries[file_d];
-    	if (entry == NULL) {file_close(file_d);}
+    	struct vnode *entry = ft->t_entries[file_d];
+    	if (entry != NULL) {file_close(file_d);}
     }
     kfree(ft);
 }	
