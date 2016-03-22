@@ -245,39 +245,54 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 int
 sys_write(int fd, userptr_t buf, size_t len, int *retval) 
 {
-        struct uio user_uio;
-        struct iovec user_iov;
-        int result;
-        int offset = 0;
+	struct uio user_uio;
+	struct iovec user_iov;
+	int result;
+	int offset = 0; // Probably needs to be saved elsewhere, don't want to read from start all the time
 
-        /* Make sure we were able to init the cons_vnode */
-        if (cons_vnode == NULL) {
-          return ENODEV;
-        }
+	/* Make sure we were able to init the cons_vnode */
+	//if (cons_vnode == NULL) {
+	//  return ENODEV;
+	//}
 
-        /* Right now, only stdin (0), stdout (1) and stderr (2)
-         * are supported, and they can't be redirected to a file
-         */
-        if (fd < 0 || fd > 2) {
-          return EBADF;
-        }
+	//EINVAL <- invalid parameter
+	if (len <= 0){
+		*retval = -1;
+		return EINVAL;
+	}
 
-        /* set up a uio with the buffer, its size, and the current offset */
-        mk_useruio(&user_iov, &user_uio, buf, len, offset, UIO_WRITE);
+	/* better be a valid file descriptor */
+	if (fd > __OPEN_MAX) {
+		*retval = -1;
+		return EBADF;
+	}
 
-        /* does the write */
-        result = VOP_WRITE(cons_vnode, &user_uio);
-        if (result) {
-                return result;
-        }
+	// Using FD get vnode from procces's filetable
+	// Note: Open should have been used b4 to load the needed info onto the filetable.
+	struct vnode fileToWrite = curthread->t_filetable->t_entries[fd];
 
-        /*
-         * the amount written is the size of the buffer originally,
-         * minus how much is left in it.
-         */
-        *retval = len - user_uio.uio_resid;
+	if (fileToWrite == NULL){
+		*retval = -1;
+		return EBADF;
+	}
 
-        return 0;
+
+	/* set up a uio with the buffer, its size, and the current offset */
+	mk_useruio(&user_iov, &user_uio, buf, len, offset, UIO_WRITE);
+
+	/* does the write */
+	result = VOP_WRITE(fileToWrite, &user_uio);
+	if (result) {
+		return result;
+	}
+
+	/*
+	 * The amount written is the length of the buffer originally, minus
+	 * how much is left in it.
+	 */
+	*retval = len - user_uio.uio_resid;
+
+	return 0;
 }
 
 /*
