@@ -584,10 +584,7 @@ thread_fork(const char *name,
 			if (curthread->t_filetable->t_entries[fd]!=NULL){
 				newthread->t_filetable->t_entries[fd]=curthread->t_filetable->t_entries[fd];
 				// increment open count!
-				vnode_incompen(curthread->t_filetable->t_entries[fd]);
-			}else{
-				// no fd??
-				newthread->t_filetable->t_entries[fd]=NULL;
+				VOP_INCREF(curthread->t_filetable->t_entries[fd]);
 			}
 		}
 	}
