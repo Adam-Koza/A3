@@ -262,18 +262,30 @@ sys_lseek(int fd, off_t offset, int whence, off_t *retval)
 }
 
 
-/* really not "file" calls, per se, but might as well put it here */
 
 /*
  * sys_chdir
+ * Just copies in the pathname, then passes work to vfs_chdir.
  * 
  */
 int
-sys_chdir(userptr_t path)
+sys_chdir(userptr_t pathname)
 {
-        (void)path;
+    char *path;
+    int result;
 
-	return EUNIMP;
+    // Allocate memory for
+    if (!(path = (char *)kmalloc(__PATH_MAX))) {return ENOMEM;}
+
+    if ((result = copyinstr(pathname, path, __PATH_MAX, NULL))){
+        kfree(path);
+        return result;
+    }
+
+    if ((result = vfs_chdir(path))) {return result;}
+
+    return 0;
+
 }
 
 /*
@@ -310,7 +322,7 @@ sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
 {
         (void)fd;
         (void)buf;
-	(void)buflen;
+        (void)buflen;
         (void)retval;
 
 	return EUNIMP;
