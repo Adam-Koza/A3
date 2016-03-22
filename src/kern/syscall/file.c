@@ -69,14 +69,34 @@ int
 file_close(int fd)
 {
 
+	if (fd == NULL){
+		return EBADF;
+	}
+
 	// first check open count
 	// if 1, decrement, and undo op
 
+	struct vnode fileToClose = curthread->t_filetable->t_entries[fd];
+
+	// If more then one prosses is using this file, caused by fork()
+
+	if (fileToClose->vn_refcount > 1){
+		// Wont close file, just get rid of reference for this process
+		curthread->t_filetable->t_entries[fd] = NULL;
+		VOP_DECREF(fileToClose);
+	}
+	else{
+		// Will close file, as it's the only one being referenced.
+		curthread->t_filetable->t_entries[fd] = NULL;
+		vfs_close(fileToClose);
+	}
+
+
 	// else decrement, and remove ptr from table.
 	// DO NOT free as another process has it open.
-        (void)fd;
+     // (void)fd;
 
-	return EUNIMP;
+	return 0;
 }
 
 /*** filetable functions ***/
