@@ -118,15 +118,35 @@ sys_close(int fd)
 /* 
  * sys_dup2
  * 
+ * Design: dup2 will incerement the refetence counter.
+ * So have to call close on both new and old fd
+ * to actually fully close the file.
+ *
  */
 int
 sys_dup2(int oldfd, int newfd, int *retval)
 {
-        (void)oldfd;
-        (void)newfd;
-        (void)retval;
+	//Fist, check that file descriptors are unizue
+	if (oldfd == newfd){
+		//Do nothing
+		return 0;
+	}
 
-	return EUNIMP;
+	if (oldfd == NULL || newfd == NULL){
+		return EBADF;
+	}
+
+	// See if newfd is already being used. It's an open file
+	if (curthread->t_filetable->t_entries[newfd] != NULL){
+		sys_close(newfd);
+	}
+
+	// Set add the vnode pointer to the file table at index newfd.
+	curthread->t_filetable->t_entries[newfd] = curthread->t_filetable->t_entries[oldfd];
+	// Increment reference
+	VOP_INCREF(curthread->t_filetable->t_entries[newfd]);
+
+	return 0;
 }
 
 /*
