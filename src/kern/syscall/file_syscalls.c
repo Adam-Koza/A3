@@ -294,14 +294,15 @@ sys_chdir(userptr_t pathname)
     char *path;
     int result;
 
-    // Allocate memory for
+    // Allocate memory for new path variable.
     if (!(path = (char *)kmalloc(__PATH_MAX))) {return ENOMEM;}
 
+    // Copy in the given pathname into new path variable.
     if ((result = copyinstr(pathname, path, __PATH_MAX, NULL))){
-        kfree(path);
-        return result;
+        kfree(path); return result;
     }
 
+    // Pass work to vsf_chdir.
     if ((result = vfs_chdir(path))) {return result;}
 
     return 0;
