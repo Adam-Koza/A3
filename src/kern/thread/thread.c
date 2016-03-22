@@ -587,12 +587,9 @@ thread_fork(const char *name,
 				vnode_incompen(curthread->t_filetable->t_entries[fd]);
 			}else{
 				// no fd??
-				newthread->t_filetable=NULL;
+				newthread->t_filetable->t_entries[fd]=NULL;
 			}
 		}
-	}else{
-		// no fd??
-		newthread->t_filetable = NULL;
 	}
 
 	/*
