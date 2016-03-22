@@ -26,13 +26,36 @@
 int
 file_open(char *filename, int flags, int mode, int *retfd)
 {
-	(void)filename;
-	(void)flags;
-	(void)retfd;
-	(void)mode;
+
+	// filename is an invalid pointer
+	if (filename == NULL){
+		return EFAULT;
+	}
+
+	struct vnode *newFile;
+	int result;
 
 
-	return EUNIMP;
+	//find fd from file table of curthread
+	int fd = 0;
+	while (curthread->t_filetable->t_entries[fd] != NULL){
+		if (fd > __OPEN_MAX)
+			return EMFILE; // File table full
+		fd++;
+	}
+	// We have an fd!
+	*retfd = fd;
+	// Most done in  vfs_open, will check for valid flags
+	result = vfs_open(filename, flags, (mode_t)mode, &newFile);
+	// If error, return with that error
+	if (result){
+		return result;}
+
+	// Set the table entry to vnode of the new file
+	curthread->t_filetable->t_entries[fd] = newFile;
+
+	// Success
+	return 0;
 }
 
 
@@ -45,6 +68,12 @@ file_open(char *filename, int flags, int mode, int *retfd)
 int
 file_close(int fd)
 {
+
+	// first check open count
+	// if 1, decrement, and undo op
+
+	// else decrement, and remove ptr from table.
+	// DO NOT free as another process has it open.
         (void)fd;
 
 	return EUNIMP;
@@ -75,7 +104,10 @@ filetable_init(void)
 
 	// Declare file descriptor.
 	int fd, result;
+
+	// Setup filename path.
 	char filename[5];
+	strcpy(filename, "con:");
 
 	// Allocate memory for the new filetable.
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
@@ -86,20 +118,19 @@ filetable_init(void)
 		curthread->t_filetable->t_entries[fd] = NULL;
 	}
 
-	// Setup file descriptor for stdin.
-	// Requires file_open
-	// strcpy(filename, "con:");
-	// result = file_open(filename, O_RDONLY, 0, &fd);
-	// if (result){    // If non-zero.
-	// 	return result; // Return error.
-	// }
-	// ...
-	// Setup file descriptor for stdout.
-	// Requires file_open
-	// ...
-	// Setup file descriptor for stderr.
-	// Requires file_open
+	// [stdin]  Setup file descriptor, add to the filetable at index 0.
+	result = file_open(filename, O_RDONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
 
+	// [stdout] Setup file descriptor, add to the filetable at index 1.
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// [stderr] Setup file descriptor, add to the filetable at index 2.
+	result = file_open(filename, O_WRONLY, 0, &fd);
+	if (result) {return result;} // If an error occurred, return error.
+
+	// Otherwise, return success.
 	return 0;
 }	
 
@@ -114,8 +145,8 @@ filetable_destroy(struct filetable *ft)
 {
     int file_d;
     for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
-    	struct filetable_entry *entry = ft->t_entries[file_d];
-    	if (entry == NULL) {file_close(file_d);}
+    	struct vnode *entry = ft->t_entries[file_d];
+    	if (entry != NULL) {file_close(file_d);}
     }
     kfree(ft);
 }	

@@ -168,6 +168,9 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	  return EBADF;
 	}
 
+	// Using FD get vnode from procces's filetable
+	// Note: Open should have been used b4 to load the needed info onto the filetable.
+
 	/* set up a uio with the buffer, its size, and the current offset */
 	mk_useruio(&user_iov, &user_uio, buf, size, offset, UIO_READ);
 
