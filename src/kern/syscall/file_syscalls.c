@@ -126,13 +126,15 @@ sys_close(int fd)
 int
 sys_dup2(int oldfd, int newfd, int *retval)
 {
-	//Fist, check that file descriptors are unizue
+	//Fist, check that file descriptors are unique
 	if (oldfd == newfd){
 		//Do nothing
+		*retval = 0;
 		return 0;
 	}
 
 	if (oldfd == NULL || newfd == NULL){
+		*retval = -1;
 		return EBADF;
 	}
 
@@ -146,6 +148,7 @@ sys_dup2(int oldfd, int newfd, int *retval)
 	// Increment reference
 	VOP_INCREF(curthread->t_filetable->t_entries[newfd]);
 
+	*retval = 0;
 	return 0;
 }
 
@@ -173,29 +176,40 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	struct uio user_uio;
 	struct iovec user_iov;
 	int result;
-	int offset = 0;
+	int offset = 0; // Probably needs to be saved elsewhere, don't want to read from start all the time
 
 	/* Make sure we were able to init the cons_vnode */
-	if (cons_vnode == NULL) {
-	  return ENODEV;
+	//if (cons_vnode == NULL) {
+	//  return ENODEV;
+	//}
+
+	//EINVAL <- invalid parameter
+	if (size <= 0){
+		*retval = -1;
+		return EINVAL;
 	}
 
 	/* better be a valid file descriptor */
-	/* Right now, only stdin (0), stdout (1) and stderr (2)
-	 * are supported, and they can't be redirected to a file
-	 */
-	if (fd < 0 || fd > 2) {
-	  return EBADF;
+	if (fd > __OPEN_MAX) {
+		*retval = -1;
+		return EBADF;
 	}
 
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
+	struct vnode fileToRead = curthread->t_filetable->t_entries[fd];
+
+	if (fileToRead == NULL){
+		*retval = -1;
+		return EBADF;
+	}
+
 
 	/* set up a uio with the buffer, its size, and the current offset */
 	mk_useruio(&user_iov, &user_uio, buf, size, offset, UIO_READ);
 
 	/* does the read */
-	result = VOP_READ(cons_vnode, &user_uio);
+	result = VOP_READ(fileToRead, &user_uio);
 	if (result) {
 		return result;
 	}
