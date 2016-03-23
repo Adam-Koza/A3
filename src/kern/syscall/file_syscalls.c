@@ -345,11 +345,25 @@ sys_chdir(userptr_t pathname)
 int
 sys___getcwd(userptr_t buf, size_t buflen, int *retval)
 {
-        (void)buf;
-        (void)buflen;
-        (void)retval;
+	// to store result from vfs_getcwd
+    int result;
+    // i need these to initialize uio, which
+    // returns current working dir?
+    struct uio u_uio;
+    struct iovec u_iov;
+    // set up uio for userspace transfer, from kernel to uio_segment.
+    mk_useruio(&u_iov, &u_uio, buf, buflen, 0, UIO_READ);
 
-	return EUNIMP;
+    // ok now i have to use vfs_getcwd on this new uio.
+    // and if it works, return the result.
+    if((result=vfs_getcwd(&u_uio))){
+    	return result;
+    }
+
+    // update retval
+    *retval = buflen-u_uio.uio_resid;
+    // on succ
+    return 0;
 }
 
 /*
