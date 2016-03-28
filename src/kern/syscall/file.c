@@ -11,6 +11,7 @@
 #include <kern/unistd.h>
 #include <file.h>
 #include <syscall.h>
+#include <lib.h>
 
 /*** openfile functions ***/
 
@@ -50,6 +51,9 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	// If error, return with that error
 	if (result){
 		return result;}
+
+	newFile->offset = 0; //Set the initial offset to 0
+
 
 	// Set the table entry to vnode of the new file
 	curthread->t_filetable->t_entries[fd] = newFile;
