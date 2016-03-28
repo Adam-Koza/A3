@@ -134,7 +134,7 @@ sys_dup2(int oldfd, int newfd, int *retval)
 		return 0;
 	}
 
-	if (oldfd == NULL || newfd == NULL){
+	if (&oldfd == NULL || &newfd == NULL){
 		*retval = -1;
 		return EBADF;
 	}
@@ -277,7 +277,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
-	struct vnode fileToWrite = curthread->t_filetable->t_entries[fd];
+	struct vnode *fileToWrite = curthread->t_filetable->t_entries[fd];
 	offset = fileToWrite->offset;
 
 	if (fileToWrite == NULL){
@@ -332,7 +332,7 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 			toSetOffSet = pos + oldOffSet;
 			break;
 		case SEEK_END: //size of file + pos is new offset
-			toSetOffSet =
+			toSetOffSet = 0;
 			break;
 
 		default:
