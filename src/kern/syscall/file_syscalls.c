@@ -355,12 +355,11 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 		*retval = 0;
 		return 0;
 		//success, set offset.
-	break;
+	//break;
 
 	return EUNIMP;
-
+	}
 }
-
 
 
 /*

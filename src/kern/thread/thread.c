@@ -574,7 +574,7 @@ thread_fork(const char *name,
 	if (curthread->t_filetable!=NULL){
 		if (newthread->t_filetable==NULL){
 			// check whether filetalbe exists for newthread.
-			newthread->t_filetable = malloc(sizeof(struct filetable));
+			newthread->t_filetable = kmalloc(sizeof(struct filetable));
 		}
 		if (newthread->t_filetable == NULL){
 			return ENOMEM;
