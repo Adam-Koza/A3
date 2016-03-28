@@ -330,7 +330,7 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 			toSetOffSet = pos + oldOffSet;
 			break;
 		case SEEK_END: //size of file + pos is new offset
-			toSetOffSet =
+			toSetOffSet = 0;
 			break;
 
 		default:
@@ -394,23 +394,74 @@ sys_chdir(userptr_t pathname)
 int
 sys___getcwd(userptr_t buf, size_t buflen, int *retval)
 {
-        (void)buf;
-        (void)buflen;
-        (void)retval;
 
-	return EUNIMP;
+	// to store result from vfs_getcwd
+	int result;
+	// i need these to initialize uio, which
+	// returns current working dir?
+	struct uio u_uio;
+	struct iovec u_iov;
+	// set up uio for userspace transfer, from kernel to uio_segment.
+	mk_useruio(&u_iov, &u_uio, buf, buflen, 0, UIO_READ);
+
+	// ok now i have to use vfs_getcwd on this new uio.
+	// and if it works, return the result.
+	if((result=vfs_getcwd(&u_uio))){
+	    return result;
+	}
+
+	// update retval
+	*retval = buflen-u_uio.uio_resid;
+	// on succ
+	return 0;
 }
 
 /*
- * sys_fstat
+ * sys_fstat: returns 0 on success and -1 on error. retrieves uio referenced
+ * by fd and stores it into the stat structure pointed to by statptr.
  */
 int
 sys_fstat(int fd, userptr_t statptr)
 {
-        (void)fd;
-        (void)statptr;
 
-	return EUNIMP;
+	// initialize neccesary structs for mk_useruio.
+	struct vnode *file;
+    struct uio u_uio;
+    struct iovec u_iov;
+    // for some statistic
+    struct stat st;
+    int result;
+
+    // make sure fd is ok.
+    if (fd >= __OPEN_MAX || fd < 0){
+        return EBADF;
+    }
+
+    // get the fe from t_entries!
+    if (!(file = curthread->t_filetable->t_entries[fd])){
+        kprintf("bad fd for fstat!");
+        return EBADF;
+    }
+
+    // now we get the lock.
+    lock_acquire(file->lock);
+
+    if ((result = VOP_STAT(file, &st))){
+    	lock_release(file->lock);
+    	return result;
+    }
+    // set up uio for r/w
+    mk_useruio(&u_iov, &u_uio, statptr, sizeof(struct stat), 0, UIO_READ);
+
+    // copy stat data to uio defined by u_uio.
+    if ((result = uiomove(&st,sizeof(struct stat),&u_uio))){
+    	lock_release(file->lock);
+    	return result;
+    }
+
+    // release
+    lock_release(file->lock);
+    return result;
 }
 
 /*
