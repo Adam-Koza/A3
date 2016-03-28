@@ -278,6 +278,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
 	struct vnode fileToWrite = curthread->t_filetable->t_entries[fd];
+	offset = fileToWrite->offset;
 
 	if (fileToWrite == NULL){
 		*retval = -1;
@@ -299,6 +300,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	 * how much is left in it.
 	 */
 	*retval = len - user_uio.uio_resid;
+	fileToWrite->offset = offset + *retval;
 
 	return 0;
 }
