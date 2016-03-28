@@ -55,6 +55,8 @@ struct vnode {
 	int vn_refcount;                /* Reference count */
 	int vn_opencount;
 
+	off_t offset;					// Current offset of the file
+
 	struct fs *vn_fs;               /* Filesystem vnode belongs to */
 
 	void *vn_data;                  /* Filesystem-specific data */

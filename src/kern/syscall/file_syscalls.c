@@ -8,6 +8,7 @@
 
 #include <types.h>
 #include <kern/errno.h>
+#include <kern/seek.h>
 #include <lib.h>
 #include <thread.h>
 #include <current.h>
@@ -176,7 +177,10 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	struct uio user_uio;
 	struct iovec user_iov;
 	int result;
-	int offset = 0; // Probably needs to be saved elsewhere, don't want to read from start all the time
+	// Offset is in vnode
+	//int offset = 0; // Probably needs to be saved elsewhere, don't want to read from start all the time
+
+	// We will get off set from v_node
 
 	/* Make sure we were able to init the cons_vnode */
 	//if (cons_vnode == NULL) {
@@ -197,13 +201,14 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
-	struct vnode fileToRead = curthread->t_filetable->t_entries[fd];
+	struct vnode *fileToRead = curthread->t_filetable->t_entries[fd];
 
 	if (fileToRead == NULL){
 		*retval = -1;
 		return EBADF;
 	}
 
+	off_t offset = fileToRead->offset;
 
 	/* set up a uio with the buffer, its size, and the current offset */
 	mk_useruio(&user_iov, &user_uio, buf, size, offset, UIO_READ);
@@ -219,6 +224,9 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	 * how much is left in it.
 	 */
 	*retval = size - user_uio.uio_resid;
+
+	// Update the offset
+	fileToRead->offset = offset + *retval;
 
 	return 0;
 }
@@ -300,14 +308,55 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
  * 
  */
 int
-sys_lseek(int fd, off_t offset, int whence, off_t *retval)
+sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 {
-        (void)fd;
-        (void)offset;
-        (void)whence;
-        (void)retval;
+
+	struct vnode *toSeek = curthread->t_filetable->t_entries[fd];
+
+	// First check the vnode is valid:
+	if (toSeek == NULL){
+		*retval = -1;
+		return EBADF;
+	}
+	off_t oldOffSet = toSeek->offset;
+
+	off_t toSetOffSet;
+
+	switch(whence){
+		case SEEK_SET: //pos is new offset
+			toSetOffSet = pos;
+			break;
+		case SEEK_CUR: //pos + currenct offset is new offset
+			toSetOffSet = pos + oldOffSet;
+			break;
+		case SEEK_END: //size of file + pos is new offset
+			toSetOffSet =
+			break;
+
+		default:
+			*retval = -1;
+			return EINVAL;
+	}
+	if (pos < 0){
+		*retval = -1;
+		return EINVAL;
+	}
+	int seekResult;
+	seekResult = VOP_TRYSEEK(toSeek, pos);
+	if (seekResult){
+		//failed
+		*retval = -1;
+		return seekResult;
+	}
+	else{
+		toSeek->offset = pos;
+		*retval = 0;
+		return 0;
+		//success, set offset.
+	break;
 
 	return EUNIMP;
+
 }
 
 
