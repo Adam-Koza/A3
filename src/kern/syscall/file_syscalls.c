@@ -310,52 +310,81 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 int
 sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 {
+	// Make sure fd is valid
+	if (fd > __OPEN_MAX) {
+		*retval = -1;
+		return EBADF;
+	}
 
-	struct vnode *toSeek = curthread->t_filetable->t_entries[fd];
+	// Get the vnode to alter offset in
+	struct vnode *toSeek;
+	toSeek = curthread->t_filetable->t_entries[fd];
 
 	// First check the vnode is valid:
 	if (toSeek == NULL){
 		*retval = -1;
 		return EBADF;
 	}
+	// Get the old offset
 	off_t oldOffSet = toSeek->offset;
 
+	// Will be used to set new offset.
 	off_t toSetOffSet;
 
+	// Use whence to figure out what to do:
 	switch(whence){
 		case SEEK_SET: //pos is new offset
 			toSetOffSet = pos;
 			break;
-		case SEEK_CUR: //pos + currenct offset is new offset
+		case SEEK_CUR: //pos + current offset, is new offset
 			toSetOffSet = pos + oldOffSet;
 			break;
-		case SEEK_END: //size of file + pos is new offset
-			toSetOffSet =
+		case SEEK_END: //size of file + pos, is new offset
+			// Need to get size of file
+			// Create a stat struct, use sys_fsta to populate struct, get size.
+			struct stat *fileInfo = (struct stat*)kmalloc(sizeof(struct stat));
+			// kmalloc success?
+			if (fileInfo == NULL){
+				return ENOMEM;
+			}
+			// use sys_fstat to populate struct
+			int result;
+			result = sys_fstat(fd, (userptr_t) fileInfo);
+			// success on syscall?
+			if (result) {
+				*retval = -1;
+				return result;
+			}
+
+			toSetOffSet = (fileInfo->st_size) + pos;
 			break;
 
 		default:
+			// invalid flag
 			*retval = -1;
 			return EINVAL;
 	}
-	if (pos < 0){
+	// Offset cannot be negative
+	if (toSetOffSet < 0){
 		*retval = -1;
 		return EINVAL;
 	}
 	int seekResult;
-	seekResult = VOP_TRYSEEK(toSeek, pos);
+	seekResult = VOP_TRYSEEK(toSeek, toSetOffSet);
 	if (seekResult){
 		//failed
 		*retval = -1;
 		return seekResult;
 	}
 	else{
-		toSeek->offset = pos;
+		//success, set offset.
+		toSeek->offset = toSetOffSet;
 		*retval = 0;
 		return 0;
-		//success, set offset.
-	break;
+	}
 
-	return EUNIMP;
+
+
 
 }
 
