@@ -421,25 +421,22 @@ int
 sys___getcwd(userptr_t buf, size_t buflen, int *retval)
 {
 
-	// to store result from vfs_getcwd
-	int result;
-	// i need these to initialize uio, which
-	// returns current working dir?
-	struct uio u_uio;
-	struct iovec u_iov;
-	// set up uio for userspace transfer, from kernel to uio_segment.
-	mk_useruio(&u_iov, &u_uio, buf, buflen, 0, UIO_READ);
+    int result;
+	struct uio user_uio;
+	struct iovec user_iov;
 
-	// ok now i have to use vfs_getcwd on this new uio.
-	// and if it works, return the result.
-	if((result=vfs_getcwd(&u_uio))){
-	    return result;
-	}
+	// Set up a uio with the buffer, its size, and offset of 0.
+    mk_useruio(&user_iov, &user_uio, buf, buflen, 0, UIO_READ);
 
-	// update retval
-	*retval = buflen-u_uio.uio_resid;
-	// on succ
-	return 0;
+    // Pass work to vsf_getcwd.
+    if ((result = vfs_getcwd(&u_uio))) {return result;}
+
+    // Set return value to the original size of the buffer, minus how much is left in it.
+    *retval = buflen - u_uio.uio_resid;
+
+    // Return Success.
+    return 0;
+
 }
 
 /*
