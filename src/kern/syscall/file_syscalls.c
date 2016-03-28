@@ -493,13 +493,32 @@ sys_fstat(int fd, userptr_t statptr)
 int
 sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
 {
-        (void)fd;
-        (void)buf;
-        (void)buflen;
-        (void)retval;
+    int result, offset;
+    struct uio user_uio;
+    struct iovec user_iov;
+    struct vnode* entry;
 
-	return EUNIMP;
+    //lock_acquire(entry->lock);
+
+    //
+    entry = curthread->t_filetable->t_entries[fd];
+    offset = entry->offset;
+
+    mk_useruio(&user_iov, &user_uio, buf, buflen, offset, UIO_READ);
+
+    if((result = VOP_GETDIRENTRY(entry, &user_uio))){
+        //lock_release(entry->lock);
+        return result;
+    }
+
+    *retval = buflen - u_uio.uio_resid;
+    entry->offset = u_uio.uio_offset;
+
+    //lock_release(entry->lock);
+
+    return 0;
 }
+
 
 /* END A3 SETUP */
 

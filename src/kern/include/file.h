@@ -8,6 +8,7 @@
 #define _FILE_H_
 
 #include <kern/limits.h>
+#include <spinlock.h>
 
 struct vnode;
 
@@ -18,6 +19,7 @@ struct vnode;
  * array of ints is just intended to make the compiler happy.
  */
 struct filetable {
+	struct lock *t_lock;
 	struct vnode *t_entries[__OPEN_MAX];
 };
 

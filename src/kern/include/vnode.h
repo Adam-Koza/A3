@@ -59,9 +59,8 @@ struct vnode {
 
 	off_t offset;					// Current offset of the file
 
-	struct lock *lock;				// lock.
+	struct lock *v_lock;				// vnode lock.
 	struct fs *vn_fs;               /* Filesystem vnode belongs to */
-	int flags;						// some flags.
 	void *vn_data;                  /* Filesystem-specific data */
 	const struct vnode_ops *vn_ops; /* Functions on this vnode */
 };
