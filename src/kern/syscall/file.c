@@ -9,6 +9,10 @@
 #include <kern/limits.h>
 #include <kern/stat.h>
 #include <kern/unistd.h>
+#include <kern/fcntl.h>
+#include <vnode.h>
+#include <vfs.h>
+#include <current.h>
 #include <file.h>
 #include <syscall.h>
 
@@ -69,14 +73,12 @@ int
 file_close(int fd)
 {
 
-	if (fd == NULL){
-		return EBADF;
-	}
+	if (&fd == NULL) {return EBADF;}
 
 	// first check open count
 	// if 1, decrement, and undo op
 
-	struct vnode fileToClose = curthread->t_filetable->t_entries[fd];
+	struct vnode *fileToClose = curthread->t_filetable->t_entries[fd];
 
 	// If more then one prosses is using this file, caused by fork()
 
