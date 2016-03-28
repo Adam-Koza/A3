@@ -395,11 +395,21 @@ sys_chdir(userptr_t pathname)
 int
 sys___getcwd(userptr_t buf, size_t buflen, int *retval)
 {
-        (void)buf;
-        (void)buflen;
-        (void)retval;
+    int result;
+	struct uio user_uio;
+	struct iovec user_iov;
 
-	return EUNIMP;
+	// Set up a uio with the buffer, its size, and offset of 0.
+    mk_useruio(&user_iov, &user_uio, buf, buflen, 0, UIO_READ);
+
+    // Pass work to vsf_getcwd.
+    if ((result = vfs_getcwd(&u_uio))) {return result;}
+
+    // Set return value to the original size of the buffer, minus how much is left in it.
+    *retval = buflen - u_uio.uio_resid;
+
+    // Return Success.
+    return 0;
 }
 
 /*
