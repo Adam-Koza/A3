@@ -139,6 +139,7 @@ sys_dup2(int oldfd, int newfd, int *retval)
 		return EBADF;
 	}
 
+
 	// See if newfd is already being used. It's an open file
 	if (curthread->t_filetable->t_entries[newfd] != NULL){
 		sys_close(newfd);
@@ -199,12 +200,16 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 		return EBADF;
 	}
 
+	// Lock down the file table.
+	lock_acquire(curthread->t_lock);
+
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
 	struct vnode *fileToRead = curthread->t_filetable->t_entries[fd];
 
 	if (fileToRead == NULL){
 		*retval = -1;
+		lock_release(curthread->t_lock);
 		return EBADF;
 	}
 
@@ -216,6 +221,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	/* does the read */
 	result = VOP_READ(fileToRead, &user_uio);
 	if (result) {
+		lock_release(curthread->t_lock);
 		return result;
 	}
 
@@ -227,6 +233,9 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// Update the offset
 	fileToRead->offset = offset + *retval;
+
+	// Release the file table.
+	lock_release(curthread->t_lock);
 
 	return 0;
 }
@@ -255,54 +264,45 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 {
 	struct uio user_uio;
 	struct iovec user_iov;
-	int result;
-	int offset = 0; // Probably needs to be saved elsewhere, don't want to read from start all the time
+	int result, offset;
 
-	/* Make sure we were able to init the cons_vnode */
-	//if (cons_vnode == NULL) {
-	//  return ENODEV;
-	//}
+	// Check for invalid parameter.
+	if (len <= 0) {*retval = -1; return EINVAL;}
 
-	//EINVAL <- invalid parameter
-	if (len <= 0){
-		*retval = -1;
-		return EINVAL;
-	}
+	// Check for invalid file descriptor.
+	if (fd > __OPEN_MAX) {*retval = -1; return EBADF;}
 
-	/* better be a valid file descriptor */
-	if (fd > __OPEN_MAX) {
-		*retval = -1;
-		return EBADF;
-	}
+	// Lock down the file table.
+	lock_acquire(curthread->t_lock);
 
-	// Using FD get vnode from procces's filetable
-	// Note: Open should have been used b4 to load the needed info onto the filetable.
+	// Grab vnode using fd from procces's filetable and obtain it's offset.
 	struct vnode *fileToWrite = curthread->t_filetable->t_entries[fd];
 	offset = fileToWrite->offset;
 
+	// Make sure vnode exists.
 	if (fileToWrite == NULL){
-		*retval = -1;
-		return EBADF;
+		lock_release(curthread->t_lock); *retval = -1; return EBADF;
 	}
 
-
-	/* set up a uio with the buffer, its size, and the current offset */
+	// Setup a uio with the buffer, its size, and it's current offset.
 	mk_useruio(&user_iov, &user_uio, buf, len, offset, UIO_WRITE);
 
-	/* does the write */
-	result = VOP_WRITE(fileToWrite, &user_uio);
-	if (result) {
-		return result;
+	// Pass work to VOP_WRITE.
+	if (result = VOP_WRITE(fileToWrite, &user_uio)) {
+		lock_release(curthread->t_lock); *retval = -1; return result;
 	}
 
-	/*
-	 * The amount written is the length of the buffer originally, minus
-	 * how much is left in it.
-	 */
+	// Set return value to the original size of the buffer, minus how much is left in it.
 	*retval = len - user_uio.uio_resid;
-	fileToWrite->offset = offset + *retval;
 
-	return 0;
+    // Set new offset.
+	fileToWrite->offset = u_uio.uio_offset;
+
+    // Release the file table.
+    lock_release(curthread->t_lock);
+
+    // Success.
+    return 0;
 }
 
 /*
@@ -429,7 +429,7 @@ sys___getcwd(userptr_t buf, size_t buflen, int *retval)
     mk_useruio(&user_iov, &user_uio, buf, buflen, 0, UIO_READ);
 
     // Pass work to vsf_getcwd.
-    if ((result = vfs_getcwd(&u_uio))) {return result;}
+    if ((result = vfs_getcwd(&u_uio))) {*retval = -1; return result;}
 
     // Set return value to the original size of the buffer, minus how much is left in it.
     *retval = buflen - u_uio.uio_resid;
@@ -460,17 +460,18 @@ sys_fstat(int fd, userptr_t statptr)
         return EBADF;
     }
 
+    // now we get the lock.
+    lock_acquire(curthread->t_lock);
+
     // get the fe from t_entries!
     if (!(file = curthread->t_filetable->t_entries[fd])){
         kprintf("bad fd for fstat!");
+        lock_release(curthread->t_lock);
         return EBADF;
     }
 
-    // now we get the lock.
-    lock_acquire(file->lock);
-
     if ((result = VOP_STAT(file, &st))){
-    	lock_release(file->lock);
+    	lock_release(curthread->t_lock);
     	return result;
     }
     // set up uio for r/w
@@ -478,12 +479,12 @@ sys_fstat(int fd, userptr_t statptr)
 
     // copy stat data to uio defined by u_uio.
     if ((result = uiomove(&st,sizeof(struct stat),&u_uio))){
-    	lock_release(file->lock);
+    	lock_release(curthread->t_lock);
     	return result;
     }
 
     // release
-    lock_release(file->lock);
+    lock_release(curthread->t_lock);
     return result;
 }
 
@@ -498,24 +499,31 @@ sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
     struct iovec user_iov;
     struct vnode* entry;
 
-    //lock_acquire(entry->lock);
+    // Lock down the file table.
+    lock_acquire(curthread->t_lock);
 
-    //
+    // Grab file table entry and it's offset.
     entry = curthread->t_filetable->t_entries[fd];
     offset = entry->offset;
 
+    // Set up a uio with the buffer, its size, and offset.
     mk_useruio(&user_iov, &user_uio, buf, buflen, offset, UIO_READ);
 
+    // Pass work to VOP_GETDIRENTRY.
     if((result = VOP_GETDIRENTRY(entry, &user_uio))){
-        //lock_release(entry->lock);
-        return result;
+        lock_release(curthread->t_lock); *retval = -1; return result;
     }
 
+    // Set return value to the original size of the buffer, minus how much is left in it.
     *retval = buflen - u_uio.uio_resid;
+
+    // Add new offset.
     entry->offset = u_uio.uio_offset;
 
-    //lock_release(entry->lock);
+    // Release the file table.
+    lock_release(curthread->t_lock);
 
+    // Success.
     return 0;
 }
 
