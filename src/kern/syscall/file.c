@@ -14,6 +14,7 @@
 #include <vfs.h>
 #include <current.h>
 #include <file.h>
+#include <synch.h>
 #include <syscall.h>
 #include <lib.h>
 
@@ -116,6 +117,48 @@ file_close(int fd)
 	return 0;
 }
 
+/*
+* filetable_gen
+* pretty straightforward -- allocate the space,
+* create the lock, and initialize all entries to NULL. */
+
+int
+filetable_gen(struct thread *da_thread)
+{
+	// Declare file descriptor.
+	int fd;
+	char name[10] = "dumb_name";
+
+	// Make sure file table doesn't already exist.
+	if (da_thread->t_filetable != NULL) {return EINVAL;}
+
+	// Allocate memory for the new filetable.
+	da_thread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
+	if (da_thread->t_filetable == NULL) {return ENOMEM;}
+
+	// Create lock.
+	da_thread->t_filetable->t_lock = lock_create(name);
+
+	// Lock down the file table.
+	lock_acquire(da_thread->t_filetable->t_lock);
+
+	// Initialize all file descriptor entries to NULL.
+	for (fd = 0; fd < __OPEN_MAX; fd++){
+		da_thread->t_filetable->t_entries[fd] = NULL;
+	}
+
+	// Lock down the file table.
+	lock_release(da_thread->t_filetable->t_lock);
+
+	// Return success.
+	return 0;
+
+}
+
+
+
+
+
 /*** filetable functions ***/
 
 /* 
@@ -146,26 +189,27 @@ filetable_init(void)
 	char filename[5];
 	strcpy(filename, "con:");
 
-	// Allocate memory for the new filetable.
-	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
-	if (curthread->t_filetable == NULL) {return ENOMEM;}
+	// Pass work to filetable_gen.
+	result = filetable_gen(curthread);
+	if (result) {return result;}
 
-	// Initialize all file descriptor entries to NULL.
-	for (fd = 0; fd < __OPEN_MAX; fd++){
-		curthread->t_filetable->t_entries[fd] = NULL;
-	}
+	// Lock down the file table.
+	lock_acquire(curthread->t_filetable->t_lock);
 
 	// [stdin]  Setup file descriptor, add to the filetable at index 0.
 	result = file_open(filename, O_RDONLY, 0, &fd);
-	if (result) {return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// [stdout] Setup file descriptor, add to the filetable at index 1.
 	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// [stderr] Setup file descriptor, add to the filetable at index 2.
 	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
+
+	// Release lock on file table.
+	lock_release(curthread->t_filetable->t_lock);
 
 	// Otherwise, return success.
 	return 0;
@@ -181,11 +225,18 @@ void
 filetable_destroy(struct filetable *ft)
 {
     int file_d;
+
+    // Lock down the current thread.
+    lock_acquire(curthread->t_filetable->t_lock);
+
     for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
     	struct vnode *entry = ft->t_entries[file_d];
     	if (entry != NULL) {file_close(file_d);}
     }
     kfree(ft);
+
+    // Release lock on current thread.
+    lock_release(curthread->t_filetable->t_lock);
 }	
 
 

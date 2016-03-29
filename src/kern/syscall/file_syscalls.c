@@ -212,7 +212,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	}
 
 	// Lock down the file table.
-	lock_acquire(curthread->t_lock);
+	lock_acquire(curthread->t_filetable->t_lock);
 
 	// Using FD get vnode from procces's filetable
 	// Note: Open should have been used b4 to load the needed info onto the filetable.
@@ -220,7 +220,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	if (fileToRead == NULL){
 		*retval = -1;
-		lock_release(curthread->t_lock);
+		lock_release(curthread->t_filetable->t_lock);
 		return EBADF;
 	}
 
@@ -233,8 +233,8 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	/* does the read */
 	result = VOP_READ(fileToRead, &user_uio);
 	if (result) {
-		lock_release(curthread->t_lock);
 		lock_release(fileToRead->v_lock);
+		lock_release(curthread->t_filetable->t_lock);
 		return result;
 	}
 
@@ -248,7 +248,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	fileToRead->offset = offset + *retval;
 	lock_release(fileToRead->v_lock);
 	// Release the file table.
-	lock_release(curthread->t_lock);
+	lock_release(curthread->t_filetable->t_lock);
 
 	return 0;
 }
@@ -287,14 +287,14 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	if (fd < 0) {*retval = -1; return EBADF;}
 
 	// Lock down the file table.
-	lock_acquire(curthread->t_lock);
+	lock_acquire(curthread->t_filetable->t_lock);
 
 	// Grab vnode using fd from procces's filetable and obtain it's offset.
 	struct vnode *fileToWrite = curthread->t_filetable->t_entries[fd];
 
 	// Make sure vnode exists.
 	if (fileToWrite == NULL){
-		lock_release(curthread->t_lock); *retval = -1; return EBADF;
+		lock_release(curthread->t_filetable->t_lock); *retval = -1; return EBADF;
 	}
 
 	lock_acquire(fileToWrite->v_lock);
@@ -304,20 +304,24 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	mk_useruio(&user_iov, &user_uio, buf, len, offset, UIO_WRITE);
 
 	// Pass work to VOP_WRITE.
+
 	if (result = VOP_WRITE(fileToWrite, &user_uio)) {
 		lock_release(fileToWrite->v_lock);
-		lock_release(curthread->t_lock); *retval = -1; return result;
+		lock_release(curthread->t_filetable->t_lock);
+		*retval = -1;
+		return result;
 	}
 
 	// Set return value to the original size of the buffer, minus how much is left in it.
 	*retval = len - user_uio.uio_resid;
 
     // Set new offset.
-	fileToWrite->offset = u_uio.uio_offset;
+	fileToWrite->offset = user_uio.uio_offset;
 	// Release the vnode lock
 	lock_release(fileToWrite->v_lock);
+
     // Release the file table.
-    lock_release(curthread->t_lock);
+    lock_release(curthread->t_filetable->t_lock);
 
     // Success.
     return 0;
@@ -360,6 +364,8 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 	// Will be used to set new offset.
 	off_t toSetOffSet;
 
+	struct stat *fileInfo;
+
 	// Use whence to figure out what to do:
 	switch(whence){
 		case SEEK_SET: //pos is new offset
@@ -371,7 +377,7 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 		case SEEK_END: //size of file + pos, is new offset
 			// Need to get size of file
 			// Create a stat struct, use sys_fsta to populate struct, get size.
-			struct stat *fileInfo = (struct stat*)kmalloc(sizeof(struct stat));
+			fileInfo = (struct stat *)kmalloc(sizeof(struct stat));
 			// kmalloc success?
 			if (fileInfo == NULL){
 				return ENOMEM;
@@ -464,10 +470,10 @@ sys___getcwd(userptr_t buf, size_t buflen, int *retval)
     mk_useruio(&user_iov, &user_uio, buf, buflen, 0, UIO_READ);
 
     // Pass work to vsf_getcwd.
-    if ((result = vfs_getcwd(&u_uio))) {*retval = -1; return result;}
+    if ((result = vfs_getcwd(&user_uio))) {*retval = -1; return result;}
 
     // Set return value to the original size of the buffer, minus how much is left in it.
-    *retval = buflen - u_uio.uio_resid;
+    *retval = buflen - user_uio.uio_resid;
 
     // Return Success.
     return 0;
@@ -496,18 +502,18 @@ sys_fstat(int fd, userptr_t statptr)
     }
 
     // now we get the lock.
-    lock_acquire(curthread->t_lock);
+    lock_acquire(curthread->t_filetable->t_lock);
 
     // get the fe from t_entries!
     if (!(file = curthread->t_filetable->t_entries[fd])){
         kprintf("bad fd for fstat!");
-        lock_release(curthread->t_lock);
+        lock_release(curthread->t_filetable->t_lock);
         return EBADF;
     }
 
 
     if ((result = VOP_STAT(file, &st))){
-    	lock_release(curthread->t_lock);
+    	lock_release(curthread->t_filetable->t_lock);
     	return result;
     }
     // set up uio for r/w ??? wtf Andrew
@@ -515,12 +521,12 @@ sys_fstat(int fd, userptr_t statptr)
 
     // copy stat data to uio defined by u_uio.
     if ((result = uiomove(&st,sizeof(struct stat),&u_uio))){
-    	lock_release(curthread->t_lock);
+    	lock_release(curthread->t_filetable->t_lock);
     	return result;
     }
 
     // release
-    lock_release(curthread->t_lock);
+    lock_release(curthread->t_filetable->t_lock);
     return result;
 }
 
@@ -536,7 +542,7 @@ sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
     struct vnode* entry;
 
     // Lock down the file table.
-    lock_acquire(curthread->t_lock);
+    lock_acquire(curthread->t_filetable->t_lock);
 
     // Grab file table entry and it's offset.
     entry = curthread->t_filetable->t_entries[fd];
@@ -548,20 +554,22 @@ sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
 
     // Pass work to VOP_GETDIRENTRY.
     if((result = VOP_GETDIRENTRY(entry, &user_uio))){
-        lock_release(curthread->t_lock);
+		lock_release(curthread->t_filetable->t_lock);
         lock_release(entry->v_lock);
         *retval = -1;
         return result;
+
     }
 
     // Set return value to the original size of the buffer, minus how much is left in it.
-    *retval = buflen - u_uio.uio_resid;
+    *retval = buflen - user_uio.uio_resid;
 
     // Add new offset.
-    entry->offset = u_uio.uio_offset;
+	entry->offset = user_uio.uio_offset;
     lock_release(entry->v_lock);
+
     // Release the file table.
-    lock_release(curthread->t_lock);
+    lock_release(curthread->t_filetable->t_lock);
 
     // Success.
     return 0;
