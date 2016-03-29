@@ -54,6 +54,8 @@ vnode_init(struct vnode *vn, const struct vnode_ops *ops,
 	vn->vn_fs = fs;
 	vn->vn_data = fsdata;
 	vn->offset = 0;
+	char lname[] = "vlock";
+	vn->v_lock = lock_create(lname);
 	return 0;
 }
 
