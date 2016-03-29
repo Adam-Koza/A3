@@ -43,6 +43,9 @@ file_open(char *filename, int flags, int mode, int *retfd)
 
 	//find fd from file table of curthread
 	int fd = 0;
+
+	lock_acquire(curthread->t_filetable->t_lock);
+
 	while (curthread->t_filetable->t_entries[fd] != NULL){
 		if (fd > __OPEN_MAX)
 			return EMFILE; // File table full
@@ -61,6 +64,8 @@ file_open(char *filename, int flags, int mode, int *retfd)
 
 	// Set the table entry to vnode of the new file
 	curthread->t_filetable->t_entries[fd] = newFile;
+
+	lock_release(curthread->t_filetable->t_lock);
 
 	// Success
 	return 0;
@@ -82,9 +87,14 @@ file_close(int fd)
 	// first check open count
 	// if 1, decrement, and undo op
 
+	lock_acquire(curthread->t_filetable->t_lock);
+
 	struct vnode *fileToClose = curthread->t_filetable->t_entries[fd];
 
 	// If more then one prosses is using this file, caused by fork()
+
+	// Will prevent a forked node closing or otherwise altering
+	lock_acquire(fileToClose->v_lock);
 
 	if (fileToClose->vn_refcount > 1){
 		// Wont close file, just get rid of reference for this process
@@ -96,7 +106,8 @@ file_close(int fd)
 		curthread->t_filetable->t_entries[fd] = NULL;
 		vfs_close(fileToClose);
 	}
-
+	lock_release(fileToClose->v_lock);
+	lock_release(curthread->t_filetable->t_lock);
 
 	// else decrement, and remove ptr from table.
 	// DO NOT free as another process has it open.
