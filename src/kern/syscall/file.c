@@ -125,11 +125,8 @@ file_close(int fd)
 int
 filetable_init(void)
 {
-	// Lock down the current thread.
-	lock_acquire(curthread->t_lock);
-
 	// Make sure filetable doesn't already exist.
-	if (curthread->t_filetable != NULL) {lock_release(curthread->t_lock); return EINVAL;}
+	if (curthread->t_filetable != NULL) {return EINVAL;}
 
 	// Declare file descriptor.
 	int fd, result;
@@ -140,7 +137,10 @@ filetable_init(void)
 
 	// Allocate memory for the new filetable.
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
-	if (curthread->t_filetable == NULL) {lock_release(curthread->t_lock); return ENOMEM;}
+	if (curthread->t_filetable == NULL) {return ENOMEM;}
+
+	// Lock down the current thread.
+	lock_acquire(curthread->t_filetable->t_lock);
 
 	// Initialize all file descriptor entries to NULL.
 	for (fd = 0; fd < __OPEN_MAX; fd++){
@@ -149,18 +149,18 @@ filetable_init(void)
 
 	// [stdin]  Setup file descriptor, add to the filetable at index 0.
 	result = file_open(filename, O_RDONLY, 0, &fd);
-	if (result) {lock_release(curthread->t_lock); return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// [stdout] Setup file descriptor, add to the filetable at index 1.
 	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {lock_release(curthread->t_lock); return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// [stderr] Setup file descriptor, add to the filetable at index 2.
 	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {lock_release(curthread->t_lock); return result;} // If an error occurred, return error.
+	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// Release lock on current thread.
-	lock_release(curthread->t_lock);
+	lock_release(curthread->t_filetable->t_lock);
 
 	// Otherwise, return success.
 	return 0;
@@ -178,7 +178,7 @@ filetable_destroy(struct filetable *ft)
     int file_d;
 
     // Lock down the current thread.
-    lock_acquire(curthread->t_lock);
+    lock_acquire(curthread->t_filetable->t_lock);
 
     for (file_d = 0; file_d < __OPEN_MAX; file_d++) {
     	struct vnode *entry = ft->t_entries[file_d];
@@ -187,7 +187,7 @@ filetable_destroy(struct filetable *ft)
     kfree(ft);
 
     // Release lock on current thread.
-    lock_release(curthread->t_lock);
+    lock_release(curthread->t_filetable->t_lock);
 }	
 
 
