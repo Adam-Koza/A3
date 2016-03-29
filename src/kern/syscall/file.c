@@ -139,7 +139,7 @@ filetable_init(void)
 	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
 	if (curthread->t_filetable == NULL) {return ENOMEM;}
 
-	// Lock down the current thread.
+	// Lock down the file table.
 	lock_acquire(curthread->t_filetable->t_lock);
 
 	// Initialize all file descriptor entries to NULL.
@@ -159,7 +159,7 @@ filetable_init(void)
 	result = file_open(filename, O_WRONLY, 0, &fd);
 	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
-	// Release lock on current thread.
+	// Release lock on file table.
 	lock_release(curthread->t_filetable->t_lock);
 
 	// Otherwise, return success.
