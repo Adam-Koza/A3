@@ -490,10 +490,11 @@ sys_fstat(int fd, userptr_t statptr)
 
 	// initialize neccesary structs for mk_useruio.
 	struct vnode *file;
-    struct uio u_uio;
-    struct iovec u_iov;
+    //struct uio u_uio;
+    //struct iovec u_iov;
     // for some statistic
-    struct stat st;
+    struct stat *st;
+    st = (struct stat *)statptr;
     int result;
 
     // make sure fd is ok.
@@ -512,22 +513,23 @@ sys_fstat(int fd, userptr_t statptr)
     }
 
 
-    if ((result = VOP_STAT(file, &st))){
+    if ((result = VOP_STAT(file, st))){
     	lock_release(curthread->t_filetable->t_lock);
     	return result;
     }
     // set up uio for r/w ??? wtf Andrew
-    mk_useruio(&u_iov, &u_uio, statptr, sizeof(struct stat), 0, UIO_READ);
+    //mk_useruio(&u_iov, &u_uio, statptr, sizeof(struct stat), 0, UIO_READ);
 
     // copy stat data to uio defined by u_uio.
+    /*
     if ((result = uiomove(&st,sizeof(struct stat),&u_uio))){
     	lock_release(curthread->t_filetable->t_lock);
     	return result;
     }
-
+	*/
     // release
     lock_release(curthread->t_filetable->t_lock);
-    return result;
+    return 0;
 }
 
 /*
