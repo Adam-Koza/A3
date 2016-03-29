@@ -29,34 +29,6 @@
  */
 struct vnode *cons_vnode=NULL; 
 
-/* This function should be deleted, including the call in main.c, when you
- * have proper initialization of the first 3 file descriptors in your 
- * open file table implementation.
- * You may find it useful as an example of how to get a vnode for the 
- * console device.
- */
-void dumb_consoleIO_bootstrap()
-{
-  int result;
-  char path[5];
-
-  /* The path passed to vfs_open must be mutable.
-   * vfs_open may modify it.
-   */
-
-  strcpy(path, "con:");
-  result = vfs_open(path, O_RDWR, 0, &cons_vnode);
-
-  if (result) {
-    /* Tough one... if there's no console, there's not
-     * much point printing a warning...
-     * but maybe the bootstrap was just called in the wrong place
-     */
-    kprintf("Warning: could not initialize console vnode\n");
-    kprintf("User programs will not be able to read/write\n");
-    cons_vnode = NULL;
-  }
-}
 
 /*
  * mk_useruio
