@@ -288,7 +288,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	mk_useruio(&user_iov, &user_uio, buf, len, offset, UIO_WRITE);
 
 	// Pass work to VOP_WRITE.
-	if (result = VOP_WRITE(fileToWrite, &user_uio)) {
+	if ((result = VOP_WRITE(fileToWrite, &user_uio))) {
 		lock_release(curthread->t_filetable->t_lock); *retval = -1; return result;
 	}
 
@@ -296,7 +296,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 	*retval = len - user_uio.uio_resid;
 
     // Set new offset.
-	fileToWrite->offset = u_uio.uio_offset;
+	fileToWrite->offset = user_uio.uio_offset;
 
     // Release the file table.
     lock_release(curthread->t_filetable->t_lock);
@@ -333,6 +333,8 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 	// Will be used to set new offset.
 	off_t toSetOffSet;
 
+	struct stat *fileInfo;
+
 	// Use whence to figure out what to do:
 	switch(whence){
 		case SEEK_SET: //pos is new offset
@@ -344,7 +346,7 @@ sys_lseek(int fd, off_t pos, int whence, off_t *retval)
 		case SEEK_END: //size of file + pos, is new offset
 			// Need to get size of file
 			// Create a stat struct, use sys_fsta to populate struct, get size.
-			struct stat *fileInfo = (struct stat*)kmalloc(sizeof(struct stat));
+			fileInfo = (struct stat *)kmalloc(sizeof(struct stat));
 			// kmalloc success?
 			if (fileInfo == NULL){
 				return ENOMEM;
@@ -429,10 +431,10 @@ sys___getcwd(userptr_t buf, size_t buflen, int *retval)
     mk_useruio(&user_iov, &user_uio, buf, buflen, 0, UIO_READ);
 
     // Pass work to vsf_getcwd.
-    if ((result = vfs_getcwd(&u_uio))) {*retval = -1; return result;}
+    if ((result = vfs_getcwd(&user_uio))) {*retval = -1; return result;}
 
     // Set return value to the original size of the buffer, minus how much is left in it.
-    *retval = buflen - u_uio.uio_resid;
+    *retval = buflen - user_uio.uio_resid;
 
     // Return Success.
     return 0;
@@ -515,10 +517,10 @@ sys_getdirentry(int fd, userptr_t buf, size_t buflen, int *retval)
     }
 
     // Set return value to the original size of the buffer, minus how much is left in it.
-    *retval = buflen - u_uio.uio_resid;
+    *retval = buflen - user_uio.uio_resid;
 
     // Add new offset.
-    entry->offset = u_uio.uio_offset;
+    entry->offset = user_uio.uio_offset;
 
     // Release the file table.
     lock_release(curthread->t_filetable->t_lock);

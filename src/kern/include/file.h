@@ -25,6 +25,7 @@ struct filetable {
 
 /* these all have an implicit arg of the curthread's filetable */
 int filetable_init(void);
+int filetable_gen(struct thread *da_thread);
 void filetable_destroy(struct filetable *ft);
 
 /* opens a file (must be kernel pointers in the args) */

@@ -14,6 +14,7 @@
 #include <vfs.h>
 #include <current.h>
 #include <file.h>
+#include <synch.h>
 #include <syscall.h>
 #include <lib.h>
 
@@ -114,7 +115,7 @@ int
 filetable_gen(struct thread *da_thread)
 {
 	// Declare file descriptor.
-	int fd, result;
+	int fd;
 	char name[10] = "dumb_name";
 
 	// Make sure file table doesn't already exist.
