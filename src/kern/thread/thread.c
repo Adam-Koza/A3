@@ -579,6 +579,11 @@ thread_fork(const char *name,
 		if (newthread->t_filetable == NULL){
 			return ENOMEM;
 		}
+
+		// Need to call the function that gives a kmalloced table, wil all NUll entires
+		// and a initiallized lock
+		// Waiting on Adam.
+
 		// now we copy the file descriptors
 		for (fd=0; fd<__OPEN_MAX;fd++){
 			if (curthread->t_filetable->t_entries[fd]!=NULL){
