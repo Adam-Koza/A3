@@ -105,6 +105,48 @@ file_close(int fd)
 	return 0;
 }
 
+/*
+* filetable_gen
+* pretty straightforward -- allocate the space,
+* create the lock, and initialize all entries to NULL. */
+
+int
+filetable_gen(struct thread *da_thread)
+{
+	// Declare file descriptor.
+	int fd, result;
+	char name[10] = "dumb_name";
+
+	// Make sure file table doesn't already exist.
+	if (da_thread->t_filetable != NULL) {return EINVAL;}
+
+	// Allocate memory for the new filetable.
+	da_thread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
+	if (da_thread->t_filetable == NULL) {return ENOMEM;}
+
+	// Create lock.
+	da_thread->t_filetable->t_lock = lock_create(name);
+
+	// Lock down the file table.
+	lock_acquire(da_thread->t_filetable->t_lock);
+
+	// Initialize all file descriptor entries to NULL.
+	for (fd = 0; fd < __OPEN_MAX; fd++){
+		da_thread->t_filetable->t_entries[fd] = NULL;
+	}
+
+	// Lock down the file table.
+	lock_release(da_thread->t_filetable->t_lock);
+
+	// Return success.
+	return 0;
+
+}
+
+
+
+
+
 /*** filetable functions ***/
 
 /* 
@@ -135,17 +177,12 @@ filetable_init(void)
 	char filename[5];
 	strcpy(filename, "con:");
 
-	// Allocate memory for the new filetable.
-	curthread->t_filetable = (struct filetable *)kmalloc(sizeof(struct filetable));
-	if (curthread->t_filetable == NULL) {return ENOMEM;}
+	// Pass work to filetable_gen.
+	result = filetable_gen(curthread);
+	if (result) {return result;}
 
 	// Lock down the file table.
 	lock_acquire(curthread->t_filetable->t_lock);
-
-	// Initialize all file descriptor entries to NULL.
-	for (fd = 0; fd < __OPEN_MAX; fd++){
-		curthread->t_filetable->t_entries[fd] = NULL;
-	}
 
 	// [stdin]  Setup file descriptor, add to the filetable at index 0.
 	result = file_open(filename, O_RDONLY, 0, &fd);
