@@ -45,7 +45,7 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	//find fd from file table of curthread
 	int fd = 0;
 
-	lock_acquire(curthread->t_filetable->t_lock);
+	//lock_acquire(curthread->t_filetable->t_lock);
 
 	while (curthread->t_filetable->t_entries[fd] != NULL){
 		if (fd > __OPEN_MAX)
@@ -66,7 +66,7 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	// Set the table entry to vnode of the new file
 	curthread->t_filetable->t_entries[fd] = newFile;
 
-	lock_release(curthread->t_filetable->t_lock);
+	//lock_release(curthread->t_filetable->t_lock);
 
 	// Success
 	return 0;

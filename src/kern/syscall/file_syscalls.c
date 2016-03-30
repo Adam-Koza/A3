@@ -73,7 +73,9 @@ sys_open(userptr_t filename, int flags, int mode, int *retval)
 		return result;
 	}
 
+	lock_acquire(curthread->t_filetable->t_lock);
 	result =  file_open(fname, flags, mode, retval);
+	lock_release(curthread->t_filetable->t_lock);
 	kfree(fname);
 	return result;
 }
