@@ -62,13 +62,17 @@ int pid_detach(pid_t childpid);
  * Set the exit status of the current thread to status.  Wake any 
  * threads waiting to read this status.
  */
-void pid_exit(int status, bool dodetach);
+void pid_exit(int status, bool dodetach, struct thread *cur);
 
 /*
  * Return the exit status of the thread associated with targetpid as
  * soon as it is available.
  */
 int pid_join(pid_t targetpid, int *status, int flags);
-
-
+/*
+ * Sets the flag of a given thread.
+ */
+//void pid_signalhandle(void);
+int pid_setflag(pid_t targetpid, int flag);
+int pid_getflag(pid_t pid);
 #endif /* _PID_H_ */

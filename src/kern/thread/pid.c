@@ -221,28 +221,6 @@ pid_bootstrap(void)
 	nprocs = 1;
 }
 
-/*
- * pi_get: look up a pidinfo in the process table.
- */
-static
-struct pidinfo *
-pi_get(pid_t pid)
-{
-	struct pidinfo *pi;
-
-	KASSERT(pid>=0);
-	KASSERT(pid != INVALID_PID);
-	KASSERT(lock_do_i_hold(pidlock));
-
-	pi = pidinfo[pid % PROCS_MAX];
-	if (pi==NULL) {
-		return NULL;
-	}
-	if (pi->pi_pid != pid) {
-		return NULL;
-	}
-	return pi;
-}
 
 /*
  * pi_put: insert a new pidinfo in the process table. The right slot
