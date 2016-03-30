@@ -50,16 +50,7 @@
 #if OPT_SFS
 #include <sfs.h>
 #endif
-
-/* Hacky semaphore solution to make menu thread wait for command
- * thread, in absence of thread_join solution.
- */
-#include <synch.h>
-#include <current.h>
-struct semaphore *cmd_sem;
-int progthread_pid;
-
-/* END A3 SETUP */
+#include <pid.h>
 
 /*
  * In-kernel menu and command dispatcher.
@@ -148,27 +139,15 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	char progname2[128];
 	int result;
 
-	/* BEGIN A3 SETUP */
-	/* Record pid of progthread, so only this thread will do a V()
-	 * on the semaphore when it exits.
-	 */
-	progthread_pid = curthread->t_pid;
-	/* END A3 SETUP */
-
 	KASSERT(nargs >= 1);
-
-	if (nargs > 2) {
-		kprintf("Warning: argument passing from menu not supported\n");
-	}
 
 	/* Hope we fit. */
 	KASSERT(strlen(args[0]) < sizeof(progname));
 
 	strcpy(progname, args[0]);
 	strcpy(progname2,args[0]); /* demke: make extra copy for runprogram */
-	free_args(nargs, args);
-
-	result = runprogram(progname2);
+	
+	result = runprogram(progname2, nargs, args);
 	if (result) {
 		kprintf("Running program %s failed: %s\n", progname,
 			strerror(result));
@@ -204,6 +183,23 @@ common_prog(int nargs, char **args)
 		"synchronization-problems kernel.\n");
 #endif
 
+	/*
+	 * Implementation of & option for menu when running programs.
+	 * By default, menu will wait for user program to end before running.
+	 * If on menu command line has a '&' at the end,
+	 * it will not wait for the user program to end
+	 * before continuing to run.
+	 */
+
+	bool toDetach;
+	toDetach = false;
+	pid_t childpid;
+	if (*args[nargs - 1] == '&'){
+		nargs--; // So we don't pass on &
+		toDetach = true;
+	}
+
+
 	/* demke: Make a copy of arguments to pass to new thread,
 	 * so that we aren't depending on parent's stack!
 	 */
@@ -217,7 +213,7 @@ common_prog(int nargs, char **args)
 	result = thread_fork(args_copy[0] /* thread name */,
 			cmd_progthread /* thread function */,
 			args_copy /* thread arg */, nargs /* thread arg */,
-			NULL);
+			&childpid);
 	if (result) {
 		kprintf("thread_fork failed: %s\n", strerror(result));
 		/* demke: need to free copy of args if fork fails */
@@ -225,13 +221,13 @@ common_prog(int nargs, char **args)
 		return result;
 	}
 
-	/* BEGIN A3 SETUP */
-	/* This is not needed if you have a working pid_join -
-	 * that should be used instead.
-	 */
-	/* Wait for progthread to finish and send a V() */
-	P(cmd_sem);
-	/* END A3 SETUP */
+	// If toDetach, then wont wait for program to end before continuing menu.
+	if (toDetach) {
+		pid_detach(childpid);
+	}
+	// Wait for program to end before continuing
+	// (unless it's detached, in which case join will do nothing.)
+	pid_join(childpid, NULL, (int)NULL);
 
 	return 0;
 }
@@ -700,7 +696,7 @@ static struct {
 	{ "sy2",	locktest },
 	{ "sy3",	cvtest },
 
-	/* ASST2 tests */
+	/* ASST1 tests */
 	/* For testing the wait implementation. */
 	{ "wt",		waittest },
 
@@ -832,16 +828,6 @@ void
 menu(char *args)
 {
 	char buf[64];
-
-	/* BEGIN A3 SETUP */
-	/* Initialize hacky semaphore solution to make menu thread 
-	 * wait for command program to finish.
-	 */
-	cmd_sem = sem_create("cmdsem", 0);
-	if (cmd_sem == NULL) {
-		panic("menu: could not create cmd_sem\n");
-	}
-	/* END A3 SETUP */
 
 	menu_execute(args, 1);
 

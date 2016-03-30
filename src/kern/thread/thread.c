@@ -56,8 +56,8 @@
 #include "opt-dumbvm.h" /* to switch between dumb and real vm */
 
 /* External variables for hack to make menu thread wait for progthread */
-extern struct semaphore *cmd_sem;
-extern int progthread_pid;
+//extern struct semaphore *cmd_sem;
+//extern int progthread_pid;
 
 /* END A3 SETUP */
 

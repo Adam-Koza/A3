@@ -44,6 +44,39 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+#include <copyinout.h>
+
+/*
+ * helper_size_to_allocate(string)
+ * Helper function, given a string will return size of space needed (in divisions of 4)
+ * Example: if string (null \0 terminating) is of size 5, will return value 8.
+*/
+static int helper_size_to_allocate(char *arg){
+        int length = strlen(arg);
+        int isTooSmall;
+        int toReturn = 4;
+        isTooSmall = length / 4;
+        //if 0 we are done, it fits
+        //if 1 or bigger, 
+        toReturn = toReturn + (4 * isTooSmall);
+        return toReturn;
+}
+
+/*
+ * insertArgToStack (Stack pointer in userspace, string to insert)
+ * Given a pointer to address in user space, moves the pointer down
+ * and then will insert a string into it.
+ *
+ */
+static int insertArgToStack(vaddr_t *stcPt, char *arg)
+{
+	int length = helper_size_to_allocate(arg);
+	*stcPt = *stcPt - length;
+	int result;
+	result  = copyout(arg, (userptr_t)(*stcPt), length); // &returnLength);
+	return result;
+
+}
 
 /*
  * Load program "progname" and start running it in usermode.
@@ -52,7 +85,7 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, unsigned long nargs, char **args)
 {
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
@@ -90,17 +123,57 @@ runprogram(char *progname)
 
 	/* Define the user stack in the address space */
 	result = as_define_stack(curthread->t_addrspace, &stackptr);
+	// userptr_t addrOfArg = (userptr_t)stackptr; //mOVED
 	if (result) {
 		/* thread_exit destroys curthread->t_addrspace */
 		return result;
 	}
 
+	//Will store my pointers of arguments here, put in stack later.
+	vaddr_t ptrToArgAddressInStack[nargs];
+	
+	// Had issues with data being stored at start of the stack.
+	// Moving down to avoid writing/reading issue.
+	stackptr = stackptr - 4;
+
+	// Insert strings (my arguments), and store the address (in stack)
+	// which we get from stack pointer into my array I defined earlier.
+	unsigned long i;
+	for (i = 0; i <	nargs; i++){
+		result = insertArgToStack(&stackptr, args[i]);
+		if (result){
+			return result;
+		}
+		ptrToArgAddressInStack[i] = stackptr;
+	}
+
+	//Add a Null 4 byte buffer
+	int fourBlank = (int)NULL;
+	stackptr = stackptr - 4;
+	result = copyout(&fourBlank, (userptr_t)stackptr, 4);
+
+	if (result){
+		return result;
+	}
+
+	// Insert the address values into the stack
+	for (i = nargs; i > 0 ; i--){
+		stackptr = stackptr - 4; 
+		copyout(&ptrToArgAddressInStack[(i - 1)], (userptr_t)stackptr, 4);
+
+	}
+	userptr_t addrOfArg = (userptr_t) (stackptr);
+
 	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
+	enter_new_process(nargs /*argc*/, addrOfArg /*userspace addr of argv*/,
 			  stackptr, entrypoint);
 	
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
 	return EINVAL;
 }
+
+
+
+	
 
