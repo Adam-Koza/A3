@@ -48,19 +48,11 @@
 #include <mainbus.h>
 #include <vnode.h>
 #include <kern/sysexits.h>
-#include <kern/wait.h> /* New include of macros to make exit codes for ASST2 */
-#include <pid.h> /* New include of pid functions for ASST 2 */
-
 /* BEGIN A3 SETUP */
 #include <file.h>
 #include "opt-dumbvm.h" /* to switch between dumb and real vm */
-
-/* External variables for hack to make menu thread wait for progthread */
-//extern struct semaphore *cmd_sem;
-//extern int progthread_pid;
-
-/* END A3 SETUP */
-
+#include <kern/wait.h> /* New include of macros to make exit codes for ASST1 */
+#include <pid.h> /* New include of pid functions for ASST 1 */
 #include "opt-synchprobs.h"
 
 
@@ -120,6 +112,13 @@ thread_checkstack(struct thread *thread)
 		KASSERT(((uint32_t*)thread->t_stack)[3] == THREAD_STACK_MAGIC);
 	}
 }
+
+/*
+ * Boolean variable that define if we are in kernel or user space.
+ * At start up (thread bootstap) it should be set to fale (in kernel)
+ * trap.c is the window to userspace, and will change this flag there.
+ */
+bool isUserSpace;
 
 /*
  * Create a thread. This is used both to create a first thread
@@ -237,7 +236,7 @@ cpu_create(unsigned hardware_number)
 		 */
 		/*c->c_curthread->t_stack = ... */
 
-		/* Also, set the initial process ID - New for ASST2. */
+		/* Also, set the initial process ID - New for ASST1. */
 		c->c_curthread->t_pid = BOOTUP_PID;
 	}
 	else {
@@ -247,7 +246,7 @@ cpu_create(unsigned hardware_number)
 		}
 		thread_checkstack_init(c->c_curthread);
 
-		/* Assign a process ID for the new CPU - New for ASST2. */
+		/* Assign a process ID for the new CPU - New for ASST1. */
 		result = pid_alloc(&c->c_curthread->t_pid);
 		if (result) {
 			panic("cpu_create: pid_alloc failed\n");
@@ -388,6 +387,9 @@ thread_bootstrap(void)
 	struct cpu *bootcpu;
 	struct thread *bootthread;
 
+	// Set flag to be in kernel.
+	isUserSpace = false;
+
 	cpuarray_init(&allcpus);
 
 	/*
@@ -511,7 +513,7 @@ thread_make_runnable(struct thread *target, bool already_have_lock)
  * start on the same CPU as the caller, unless the scheduler
  * intervenes first.
  *
- * ASST2 - thread_fork has been modified to return the pid of the new 
+ * ASST1 - thread_fork has been modified to return the pid of the new 
  * thread, rather than a pointer to its thread struct. For simplicity,
  * we are giving the new thread a copy of its parent's address space, if
  * it has one, contrary to the comment above.
@@ -531,6 +533,7 @@ thread_fork(const char *name,
 		return ENOMEM;
 	}
 
+
 	/* Allocate a stack */
 	newthread->t_stack = kmalloc(STACK_SIZE);
 	if (newthread->t_stack == NULL) {
@@ -539,14 +542,15 @@ thread_fork(const char *name,
 	}
 	thread_checkstack_init(newthread);
 
-	/* Get a process ID - new for ASST2 */
+	/* Get a process ID - new for ASST1 */
 	result = pid_alloc(&newthread->t_pid);
 	if (result) {
 		thread_destroy(newthread);
 		return result;
 	}
 
-	/* Copy address space if there is one - new for ASST2, sys_fork */
+
+	/* Copy address space if there is one - new for ASST1, sys_fork */
 	if (curthread->t_addrspace != NULL) {
 		result = as_copy(curthread->t_addrspace, &newthread->t_addrspace);
 		if (result) {
@@ -613,12 +617,17 @@ thread_fork(const char *name,
 	 * the thread structure from the parent thread should be done
 	 * only with caution, because in general the child thread
 	 * might exit at any time.
-	 * ASST2 - changed to return child's process ID instead of 
+	 * ASST1 - changed to return child's process ID instead of 
 	 *         thread structure.  This is safe to use even if the 
 	 *         child has already exited.
 	 */
 	if (ret != NULL) {
 		*ret = newthread->t_pid;
+		// Will also set the current thread pid to store the child pid
+	}
+	else{
+		// If parent does not want to know its child id, place the new thread in detach state
+		pid_detach(newthread->t_pid);
 	}
 
 	return 0;
@@ -875,20 +884,21 @@ void
 thread_exit(int exitcode)
 {
 	struct thread *cur;
-        (void)exitcode;  // suppress warning until code gets written
+        //(void)exitcode;  // suppress warning until code gets written
 
 	cur = curthread;
 
-	/* BEGIN A3 SETUP */
-	/* Check if this thread was forked to handle a menu command,
-	 * and if so, signal the menu thread that it is done.
-	 * This should not be used if you have a working thread_join
-	 * implementation.
-	 */
-	if (curthread->t_pid == progthread_pid) {
-		V(cmd_sem);
+	//The passing of current thread is pure paranoia, could just use curthread
+	pid_exit(exitcode, isUserSpace, cur);
+
+	//Modified to call pid_exit
+	/*
+	if (cur->t_addrspace == NULL){
+		  pid_exit(exitcode, false);
+	} else {
+		  pid_exit(exitcode, true);
 	}
-	/* END A3 SETUP */
+	*/
 
 	/* VFS fields */
 	if (cur->t_cwd) {
@@ -1328,3 +1338,4 @@ interprocessor_interrupt(void)
 	curcpu->c_ipi_pending = 0;
 	spinlock_release(&curcpu->c_ipi_lock);
 }
+
