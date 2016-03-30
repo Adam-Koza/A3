@@ -45,7 +45,7 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	//find fd from file table of curthread
 	int fd = 0;
 
-	lock_acquire(curthread->t_filetable->t_lock);
+	//lock_acquire(curthread->t_filetable->t_lock);
 
 	while (curthread->t_filetable->t_entries[fd] != NULL){
 		if (fd > __OPEN_MAX)
@@ -66,7 +66,7 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	// Set the table entry to vnode of the new file
 	curthread->t_filetable->t_entries[fd] = newFile;
 
-	lock_release(curthread->t_filetable->t_lock);
+	//lock_release(curthread->t_filetable->t_lock);
 
 	// Success
 	return 0;
@@ -201,15 +201,23 @@ filetable_init(void)
 	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
 
 	// [stdout] Setup file descriptor, add to the filetable at index 1.
-	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
+	//result = file_open(filename, O_WRONLY, 0, &fd);
+	lock_release(curthread->t_filetable->t_lock);
+	int throwaway = 0;
+	sys_dup2(0, 1, &throwaway);
+	if (result) {
+		//lock_release(curthread->t_filetable->t_lock);
+		return result;} // If an error occurred, return error.
 
 	// [stderr] Setup file descriptor, add to the filetable at index 2.
-	result = file_open(filename, O_WRONLY, 0, &fd);
-	if (result) {lock_release(curthread->t_filetable->t_lock); return result;} // If an error occurred, return error.
+	//result = file_open(filename, O_WRONLY, 0, &fd);
+	sys_dup2(0, 2, &throwaway);
+	if (result) {
+		//lock_release(curthread->t_filetable->t_lock);
+		return result;} // If an error occurred, return error.
 
 	// Release lock on file table.
-	lock_release(curthread->t_filetable->t_lock);
+	//lock_release(curthread->t_filetable->t_lock);
 
 	// Otherwise, return success.
 	return 0;

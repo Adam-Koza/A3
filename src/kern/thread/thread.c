@@ -576,23 +576,15 @@ thread_fork(const char *name,
 	 */
 
 	if (curthread->t_filetable!=NULL){
-		if (newthread->t_filetable==NULL){
-			// check whether filetalbe exists for newthread.
-			newthread->t_filetable = kmalloc(sizeof(struct filetable));
-		}
-		if (newthread->t_filetable == NULL){
-			return ENOMEM;
-		}
 
-		// Need to call the function that gives a kmalloced table, wil all NUll entires
-		// and a initiallized lock
-		// Waiting on Adam.
+		//The will create a new filetable for the thread, with it's own initializd lock.
+		filetable_gen(newthread);
 
 		// now we copy the file descriptors
 		for (fd=0; fd<__OPEN_MAX;fd++){
 			if (curthread->t_filetable->t_entries[fd]!=NULL){
 				newthread->t_filetable->t_entries[fd]=curthread->t_filetable->t_entries[fd];
-				// increment open count!
+				// increment reference count!
 				VOP_INCREF(curthread->t_filetable->t_entries[fd]);
 			}
 		}
@@ -839,6 +831,8 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 	cur->t_wchan_name = NULL;
 	cur->t_state = S_RUN;
 
+
+
 	/* Release the runqueue lock acquired in thread_switch. */
 	spinlock_release(&curcpu->c_runqueue_lock);
 
@@ -852,6 +846,9 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 
 	/* Enable interrupts. */
 	spl0();
+
+	// Initialize file table.
+	filetable_init();
 
 #if OPT_SYNCHPROBS
 	/* Yield a random number of times to get a good mix of threads. */

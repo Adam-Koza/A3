@@ -73,7 +73,9 @@ sys_open(userptr_t filename, int flags, int mode, int *retval)
 		return result;
 	}
 
+	lock_acquire(curthread->t_filetable->t_lock);
 	result =  file_open(fname, flags, mode, retval);
+	lock_release(curthread->t_filetable->t_lock);
 	kfree(fname);
 	return result;
 }
@@ -277,7 +279,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 
 	// Pass work to VOP_WRITE.
 
-	if (result = VOP_WRITE(fileToWrite, &user_uio)) {
+	if ((result = VOP_WRITE(fileToWrite, &user_uio))) {
 		lock_release(fileToWrite->v_lock);
 		lock_release(curthread->t_filetable->t_lock);
 		*retval = -1;
