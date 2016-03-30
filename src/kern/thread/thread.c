@@ -884,11 +884,11 @@ thread_exit(int exitcode)
 	 * and if so, signal the menu thread that it is done.
 	 * This should not be used if you have a working thread_join
 	 * implementation.
-	 */
+	 *
 	if (curthread->t_pid == progthread_pid) {
 		V(cmd_sem);
 	}
-	/* END A3 SETUP */
+	END A3 SETUP */
 
 	/* VFS fields */
 	if (cur->t_cwd) {

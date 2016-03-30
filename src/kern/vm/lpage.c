@@ -70,7 +70,7 @@ vm_printstats(void)
 	kprintf("vm: %lu evictions (%lu discarding, %lu writes)\n",
 		(unsigned long) te, (unsigned long) de, (unsigned long) we);
 	vm_printmdstats();
-	return 0;
+	//return 0;
 }
 
 /*
