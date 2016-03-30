@@ -479,7 +479,7 @@ pid_join(pid_t targetpid, int *status, int flags)
 
 	//Determine if targetpid is the same as the current (calling thread).
 	if (targetpid == curthread->t_pid){
-		return EDEADLK * -1;
+		return -1;
 	}
 	
 	//Grab lock.
