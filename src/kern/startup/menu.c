@@ -40,6 +40,16 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
+
+/* BEGIN A3 SETUP */
+/* Needed to omit coremaptests when using dumbvm */
+#include "opt-dumbvm.h"
+/* Needed to include optional sfs code */
+#include "opt-sfs.h"
+
+#if OPT_SFS
+#include <sfs.h>
+#endif
 #include <pid.h>
 
 /*
@@ -419,6 +429,11 @@ static const struct {
 	const char *name;
 	int (*func)(const char *device);
 } mounttable[] = {
+/* BEGIN A3 SETUP */
+#if OPT_SFS
+        { "sfs", sfs_mount },
+#endif
+/* END A3 SETUP */
 	{ NULL, NULL }
 };
 
@@ -584,6 +599,8 @@ static const char *testmenu[] = {
 	"[sy1] Semaphore test                ",
 	"[sy2] Lock test             (1)     ",
 	"[sy3] CV test               (1)     ",
+	"[cm] Coremap test           (3)     ",
+	"[cm2] Coremap stress test   (3)     ",
 	"[fs1] Filesystem test               ",
 	"[fs2] FS read stress        (4)     ",
 	"[fs3] FS write stress       (4)     ",
@@ -683,12 +700,22 @@ static struct {
 	/* For testing the wait implementation. */
 	{ "wt",		waittest },
 
+/* BEGIN A3 SETUP */
+/* Only include coremap tests if not using dumbvm */	
+#if !OPT_DUMBVM
+	/* ASST2 tests */
+	{ "cm",		coremaptest },
+	{ "cm2",	coremapstress },
+#endif
+/* END A3 SETUP */
+
 	/* file system assignment tests */
 	{ "fs1",	fstest },
 	{ "fs2",	readstress },
 	{ "fs3",	writestress },
 	{ "fs4",	writestress2 },
 	{ "fs5",	longstress },
+        { "fs6",        inlinetest },
 
 	{ NULL, NULL }
 };
