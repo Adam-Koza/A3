@@ -822,6 +822,8 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 	cur->t_wchan_name = NULL;
 	cur->t_state = S_RUN;
 
+
+
 	/* Release the runqueue lock acquired in thread_switch. */
 	spinlock_release(&curcpu->c_runqueue_lock);
 
@@ -835,6 +837,9 @@ thread_startup(void (*entrypoint)(void *data1, unsigned long data2),
 
 	/* Enable interrupts. */
 	spl0();
+
+	// Initialize file table.
+	filetable_init();
 
 #if OPT_SYNCHPROBS
 	/* Yield a random number of times to get a good mix of threads. */
