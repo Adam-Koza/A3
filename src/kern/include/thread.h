@@ -60,6 +60,8 @@ struct filetable;
 /* Macro to test if two addresses are on the same kernel stack */
 #define SAME_STACK(p1, p2)     (((p1) & STACK_MASK) == ((p2) & STACK_MASK))
 
+/* global flag that keeps stack if we are in Userspace or Kernel space. */
+extern bool isUserSpace;
 
 /* States a thread can be in. */
 typedef enum {
@@ -122,6 +124,9 @@ struct thread {
 	/* BEGIN A3 SETUP */
 	struct filetable *t_filetable;
 	/* END A3 SETUP */
+
+	// Using global flag instead: ignore bellow.
+	// bool t_isuserthread; //true if user space thread, false if kernel
 };
 
 /* Call once during system startup to allocate data structures. */
