@@ -362,11 +362,19 @@ static
 uint32_t 
 page_replace(void)
 {
-    // Complete this function.
-	return 0;
+	uint32_t where;
+	//Need to check that it's not pinned and is not kernel
+	where = random() % num_coremap_entries;
+	while (coremap[where].cm_pinned || coremap[where].cm_kernel){
+		where = random() % num_coremap_entries;
+	}
+
+	return where;
+	//return 0;
 }
 
 #else /* not OPT_RANDPAGE */
+
 
 /*
  * Sequential page replacement.
@@ -376,11 +384,35 @@ page_replace(void)
  */
 
 static
+volatile
+uint32_t
+bookmark = 0, loopit = 0;
+
+static
 uint32_t
 page_replace(void)
 {
-	// Complete this function.
-	return 0;
+	uint32_t where, i;
+
+	// Look for a unpinned and non-kernel page.
+	for (i = bookmark; i < num_coremap_entries; i++){
+		where=i;
+		if(!(coremap[where].cm_pinned || coremap[where].cm_kernel)) {
+			bookmark = where;
+			loopit = 0;
+			return where;
+		}
+	}
+	// If no page is found, reset bookmark to 0 and try again.
+	if (loopit == 0){
+		bookmark = 0;
+		loopit = 1;
+		return page_replace();
+	}
+	// Otherwise, panic since no page is found, return error value.
+	panic("Can't find a unpinned non-kernel page.\n");
+	loopit = 0;
+	return -1;
 }
 
 #endif /* OPT_RANDPAGE */
