@@ -490,10 +490,13 @@ sys_fstat(int fd, userptr_t statptr)
     int result;
 
     // make sure fd is ok.
-    if (fd >= __OPEN_MAX || fd < 0){
+    if (fd >= __OPEN_MAX || fd < 0 || fd==NULL){
         return EBADF;
     }
-
+    // make sure st is not null
+    if (st==NULL){
+    	return EFAULT;
+    }
     // now we get the lock.
     lock_acquire(curthread->t_filetable->t_lock);
 
@@ -503,7 +506,6 @@ sys_fstat(int fd, userptr_t statptr)
         lock_release(curthread->t_filetable->t_lock);
         return EBADF;
     }
-
 
     if ((result = VOP_STAT(file, st))){
     	lock_release(curthread->t_filetable->t_lock);
