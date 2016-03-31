@@ -87,6 +87,8 @@ sys_open(userptr_t filename, int flags, int mode, int *retval)
 int
 sys_close(int fd)
 {
+	if ((fd > __OPEN_MAX) || (fd < 0)) {
+			return EBADF;}
 	return file_close(fd);
 }
 
@@ -104,7 +106,7 @@ sys_dup2(int oldfd, int newfd, int *retval)
 	//Fist, check that file descriptors are unique
 	if (oldfd == newfd){
 		//Do nothing
-		*retval = 0;
+		*retval = newfd;
 		return 0;
 	}
 
@@ -118,20 +120,30 @@ sys_dup2(int oldfd, int newfd, int *retval)
 			return EBADF;
 	}
 
+	// Need to check oldfd is has a vnode lol
 	lock_acquire(curthread->t_filetable->t_lock);
+
+	struct vnode *fileToDup = curthread->t_filetable->t_entries[oldfd];
+	if (fileToDup == NULL){
+		lock_release(curthread->t_filetable->t_lock);
+		return EBADF;
+	}
+
+
 	// See if newfd is already being used. It's an open file
 	if (curthread->t_filetable->t_entries[newfd] != NULL){
 		sys_close(newfd);
 	}
 
+
 	// Set add the vnode pointer to the file table at index newfd.
-	curthread->t_filetable->t_entries[newfd] = curthread->t_filetable->t_entries[oldfd];
+	curthread->t_filetable->t_entries[newfd] = fileToDup;
 	// Increment reference
 	VOP_INCREF(curthread->t_filetable->t_entries[newfd]);
 
 	lock_release(curthread->t_filetable->t_lock);
 
-	*retval = 0;
+	*retval = newfd;
 	return 0;
 }
 
@@ -183,6 +195,12 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	if (fd < 0) {
 		*retval = -1;
 		return EBADF;
+	}
+
+	//Check buf valid?
+
+	if (buf == NULL){
+		return EFAULT;
 	}
 
 	// Lock down the file table.
@@ -279,7 +297,7 @@ sys_write(int fd, userptr_t buf, size_t len, int *retval)
 
 	// Pass work to VOP_WRITE.
 
-	if ((result = VOP_WRITE(fileToWrite, &user_uio))) {
+	if ((result = VOP_WRITE(fileToWrite, &user_uio))) { //issue
 		lock_release(fileToWrite->v_lock);
 		lock_release(curthread->t_filetable->t_lock);
 		*retval = -1;

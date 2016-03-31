@@ -83,7 +83,7 @@ int
 file_close(int fd)
 {
 
-	if (&fd == NULL) {return EBADF;}
+	//if (&fd == NULL) {return EBADF;}
 
 	// first check open count
 	// if 1, decrement, and undo op
@@ -92,7 +92,12 @@ file_close(int fd)
 
 	struct vnode *fileToClose = curthread->t_filetable->t_entries[fd];
 
-	// If more then one prosses is using this file, caused by fork()
+	if (fileToClose == NULL){
+		lock_release(curthread->t_filetable->t_lock);
+		return EBADF;
+	}
+
+	// If more then one posses is using this file, caused by fork()
 
 	// Will prevent a forked node closing or otherwise altering
 	lock_acquire(fileToClose->v_lock);
