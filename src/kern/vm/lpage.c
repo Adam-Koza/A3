@@ -420,100 +420,23 @@ lpage_zerofill(struct lpage **lpret)
 int
 lpage_fault(struct lpage *lp, struct addrspace *as, int faulttype, vaddr_t va)
 {
-	paddr_t pa, swa;
-
-	/* Pin the physical page and lock the lpage. */
-	lpage_lock_and_pin(lp);
-	// Get the physical address
-	pa = lp->lp_paddr & PAGE_FRAME;
-
-	// If the page is not in memeory, get it from swap
-	if (pa == INVALID_PADDR) {
-			swa = lp->lp_swapaddr;
-			lpage_unlock(lp);
-			// Have a page frame allocated
-			pa = coremap_allocuser(lp);
-			if (pa == INVALID_PADDR) {
-				coremap_unpin(lp->lp_paddr & PAGE_FRAME);
-				lpage_destroy(lp);
-				return ENOMEM;
-			}
-			KASSERT(coremap_pageispinned(pa));
-			lock_acquire(global_paging_lock);
-			// Add page contents from swap to physical memory
-			swap_pagein(pa, swa);
-			lpage_lock(lp);
-			lock_release(global_paging_lock);
-			/* Assert nobody else did the pagein. */
-			KASSERT((lp->lp_paddr & PAGE_FRAME) == INVALID_PADDR);
-			lp->lp_paddr = pa;
-	}
-
-	//Update TLB
-	switch (faulttype){
-	case VM_FAULT_READONLY:
-		mmu_map(as, va, pa, 0);
-		break;
-	case VM_FAULT_READ:
-	case VM_FAULT_WRITE:
-		// Set it to dirty
-		LP_SET(lp, LPF_DIRTY);
-		mmu_map(as, va, pa, 1);
-	}
-
-	// Already unpinned in mmu_map
-	lpage_unlock(lp);
-
-	return 0;
+	(void)lp;	// suppress compiler warning until code gets written
+	(void)as;	// suppress compiler warning until code gets written
+	(void)faulttype;// suppress compiler warning until code gets written
+	(void)va;	// suppress compiler warning until code gets written
+	return EUNIMP;	// suppress compiler warning until code gets written
 }
-
 
 /*
  * lpage_evict: Evict an lpage from physical memory.
  *
- * Synchronization: lock the lpage while accessing it. We come here
- * from the coremap and should have the global paging lock and should 
- * have pinned the physical page (see coremap.c:do_evict()). 
- * This is why we must not hold lpage locks while entering the coremap code.
- *
- * Similar to lpage_fault, the lpage lock should not be held while performing
- * the page out (if one is needed).
+ * Synchronization: lock the lpage while evicting it. We come here
+ * from the coremap and should have the coremap spinlock and should 
+ * have pinned the physical page. This is why we must not hold lpage
+ * locks while entering the coremap code.
  */
 void
 lpage_evict(struct lpage *lp)
 {
-
-	paddr_t physical_address;
-	off_t swap_address;
-
-	// Lock the lpage while accessing it.
-	KASSERT(lp != NULL);
-	lpage_lock(lp);
-
-	// Obtain the physical & swap address'
-	physical_address = lp->lp_paddr & PAGE_FRAME;
-	swap_address = lp->lp_swapaddr;
-
-	// If the page is stored in RAM memory...
-	if (physical_address != INVALID_PADDR) {
-		DEBUG(DB_VM, "lpage_evict: Moving page from paddr 0x%x to swapaddr 0x%llx\n", physical_address, swap_address);
-
-		// If page is dirty..
-		if (LP_ISDIRTY(lp)) {
-			// Move page into swapspace.
-			lpage_unlock(lp);
-			swap_pageout(physical_address, swap_address);
-		  	LP_CLEAR(lp, LPF_DIRTY);
-		  	lpage_lock(lp);
-		}
-
-		// Remove page from physical memory.
-		lp->lp_paddr = INVALID_PADDR;
-		lpage_unlock(lp);
-
-	}
-	else {
-		lpage_unlock(lp);
-	}
-
+	(void)lp;	// suppress compiler warning until code gets written
 }
