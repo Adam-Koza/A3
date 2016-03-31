@@ -52,12 +52,12 @@ file_open(char *filename, int flags, int mode, int *retfd)
 			return EMFILE; // File table full
 		fd++;
 	}
-	// We have an fd!
-	*retfd = fd;
+
 	// Most done in  vfs_open, will check for valid flags
 	result = vfs_open(filename, flags, (mode_t)mode, &newFile);
 	// If error, return with that error
 	if (result){
+		*retfd = -1;
 		return result;}
 
 	newFile->offset = 0; //Set the initial offset to 0
@@ -67,7 +67,8 @@ file_open(char *filename, int flags, int mode, int *retfd)
 	curthread->t_filetable->t_entries[fd] = newFile;
 
 	//lock_release(curthread->t_filetable->t_lock);
-
+	// We have an fd!
+	*retfd = fd;
 	// Success
 	return 0;
 }
