@@ -475,7 +475,10 @@ sys_fstat(int fd, userptr_t statptr)
     if (fd >= __OPEN_MAX || fd < 0){
         return EBADF;
     }
-
+    // make sure st is not null
+    if (st==NULL){
+    	return EFAULT;
+    }
     // now we get the lock.
     lock_acquire(curthread->t_filetable->t_lock);
 
