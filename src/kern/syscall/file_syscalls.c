@@ -490,7 +490,7 @@ sys_fstat(int fd, userptr_t statptr)
     int result;
 
     // make sure fd is ok.
-    if (fd >= __OPEN_MAX || fd < 0 || fd==NULL){
+    if (fd >= __OPEN_MAX || fd < 0 || &fd==NULL){
         return EBADF;
     }
     // make sure st is not null
